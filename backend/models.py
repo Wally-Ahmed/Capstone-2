@@ -34,7 +34,7 @@ class User(db.Model):
     )
     shifts = db.relationship(
         'Shift',
-        back_populates='assigned_to',
+        back_populates='assigned_owner',
         lazy='dynamic',
         cascade='all, delete-orphan',
         passive_deletes=True
@@ -56,10 +56,10 @@ class User(db.Model):
 
 class Notification_messages(db.Model):
     __tablename__ = 'notification_messages'
+    id = db.Column(db.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = db.Column(
         db.UUID(as_uuid=True),
-        db.ForeignKey('users.id', ondelete='CASCADE'),
-        primary_key=True
+        db.ForeignKey('users.id', ondelete='CASCADE')
     )
     read = db.Column(db.Boolean, nullable=False, default=False)
     message = db.Column(db.Text, nullable=False, default='')
@@ -108,6 +108,15 @@ class Group(db.Model):
         cutoff_time = datetime.now(timezone.utc) - timedelta(days=1)
         return self.shifts.filter(Shift.end_time >= cutoff_time)
 
+    # Methods
+
+    def get_details(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "owner_id": self.owner_id
+        }
+
 
 class GroupMembership(db.Model):
     __tablename__ = 'group_memberships'
@@ -151,7 +160,7 @@ class Shift(db.Model):
         back_populates='shifts',
         passive_deletes=True
     )
-    assigned_to = db.relationship(
+    assigned_owner = db.relationship(
         'User',
         back_populates='shifts',
         passive_deletes=True
