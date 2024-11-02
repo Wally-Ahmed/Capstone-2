@@ -45,6 +45,10 @@ class User(db.Model):
         current_time = datetime.now(timezone.utc)
         return self.shifts.filter(Shift.end_time >= current_time)
 
+    @property
+    def unread_notifications(self):
+        return self.shifts.filter(not Notification_messages.read)
+
     # Methods
 
     def get_details(self):
@@ -75,6 +79,16 @@ class Notification_messages(db.Model):
         back_populates='notifications',
         passive_deletes=True
     )
+
+    # Methods
+    def getdetails(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "read": self.read,
+            "message": self.message,
+            "iat": self.iat
+        }
 
 
 class Group(db.Model):

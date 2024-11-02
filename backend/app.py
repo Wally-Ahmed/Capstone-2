@@ -3,7 +3,7 @@
 from flask import Flask, redirect, url_for, jsonify, request, g, session
 from flask_debugtoolbar import DebugToolbarExtension
 from authlib.integrations.flask_client import OAuth
-from models import db, connect_db, User, Group, GroupMembership, Shift, Shift_swap
+from models import db, connect_db, User, Group, GroupMembership, Shift, Shift_swap, Notification_messages
 from auth_decorator import login_required
 from datetime import date, datetime, timezone, timedelta
 import requests
@@ -200,6 +200,19 @@ def logout():
     return jsonify({"message": "Logout successful"}), 200
 
 
+@app.route('/user/notifications', methods=["GET"])
+@login_required
+def get_user_notifications():
+    user = g.user
+
+    for key in list(session.keys()):
+        session.pop(key)
+    return jsonify({
+        "notifications": [notification.get_details() for notification in user.notifications],
+        "unread_notifications": [notification.get_details() for notification in user.unread_notifications]
+    })
+
+
 @app.route('/user/groups', methods=["GET", "POST"])
 @login_required
 def list_groups():
@@ -296,7 +309,11 @@ def approve_group_membership(membership_id):
 
     membership.approved = True
 
+    notification = Notification_messages(
+        user_id=membership.user.id, message=f"Your membership request to {membership.group.name} has been approved.")
+
     db.session.add(membership)
+    db.session.add(notification)
     db.session.commit()
 
     return jsonify({"message": "Request was approved successfully"}), 201
@@ -319,7 +336,11 @@ def decline_group_membership(membership_id):
     if membership == None:
         return jsonify({"message": "Request not found"}), 404
 
+    notification = Notification_messages(
+        user_id=membership.user.id, message=f"Your membership request to {membership.group.name} has been decline.")
+
     db.session.delete(membership)
+    db.session.add(notification)
     db.session.commit()
 
     return jsonify({"message": "Request was declined successfully"}), 204
@@ -422,7 +443,11 @@ def create_new_shift(membership_id):
         db.session.delete(end_overlaping_shift)
         shift.end_time = end_overlaping_shift.end_time
 
+    notification = Notification_messages(
+        user_id=membership.user.id, message=f"You've been assigned a new shift at {membership.group.name} from {shift.start_time.strftime()} to {shift.end_time.strftime()}.")
+
     db.session.add(shift)
+    db.session.add(notification)
     db.session.commit()
 
     return jsonify({"message": "Shift created successfully"}), 201
@@ -472,6 +497,9 @@ def modify_or_delete_shift(membership_id, shift_id):
         if not shift_owner_membership:
             return jsonify({"message": "Assigned user does not have an existing membership to this group"}), 404
 
+        initial_shift_data = shift.get_details()
+        reassign_shift_owner = shift.assigned_owner.id == shift_owner_membership_id
+
         shift.group_id = user_membership.group.id
         shift.user_id = shift_owner_membership.user.id
         shift.start_time = date.fromisoformat(start_time_iso)
@@ -497,12 +525,32 @@ def modify_or_delete_shift(membership_id, shift_id):
             db.session.delete(end_overlaping_shift)
             shift.end_time = end_overlaping_shift.end_time
 
+        if not reassign_shift_owner:
+            notification = Notification_messages(
+                user_id=shift_owner_membership.user.id, message=f"Your shift at {membership.group.name} was modified from, {initial_shift_data.start_time.strftime()} to {initial_shift_data.end_time.strftime()}, to now, {shift.start_time.strftime()} to {shift.end_time.strftime()}.")
+            db.session.add(notification)
+        else:
+            previous_owner_notification = Notification_messages(
+                user_id=initial_shift_data.user_id, message=f"Your shift at {membership.group.name} from {initial_shift_data.start_time.strftime()} to {initial_shift_data.end_time.strftime()} was unassigned.")
+            new_owner_notification = Notification_messages(
+                user_id=shift_owner_membership.user.id, message=f"You've been assigned a new shift at {membership.group.name} from {shift.start_time.strftime()} to {shift.end_time.strftime()}.")
+
+            db.session.add(previous_owner_notification)
+            db.session.add(new_owner_notification)
+
         db.session.add(shift)
         db.session.commit()
 
         return jsonify({"message": "Shift modified successfully"}), 200
+
     elif request.method == "DELETE":
+
+        notification = Notification_messages(
+            user_id=shift.assigned_owner.id, message=f"Your shift at {membership.group.name} from {initial_shift_data.start_time.strftime()} to {initial_shift_data.end_time.strftime()}, to now, {shift.start_time.strftime()} to {shift.end_time.strftime()} was unassigned.")
+
         db.session.delete(shift)
+        db.session.add(notification)
+
         db.session.commit()
 
         return jsonify({"message": "Shift deleted successfully"}), 204
@@ -580,6 +628,8 @@ def link_shift_swap(membership_id, shift_id, swap_id):
     current_shift_owner_membership = GroupMembership.query.filter_by(
         user_id=current_shift_owner.id, group_id=membership.group_id).one()
 
+    initial_shift_data = shift.get_details()
+
     if membership.admin or current_shift_owner_membership.admin:
 
         start_overlaping_shift = next(
@@ -603,10 +653,18 @@ def link_shift_swap(membership_id, shift_id, swap_id):
             shift.end_time = end_overlaping_shift.end_time
 
         shift.user_id = user.id
+
+        notification = Notification_messages(
+            user_id=initial_shift_data.user_id, message=f"Your shift at {membership.group.name} from {initial_shift_data.start_time.strftime()} to {initial_shift_data.end_time.strftime()}, was unassigned via a shift swap request.")
+
         db.session.add(shift)
+        db.session.add(notification)
         db.session.commit()
 
         return jsonify({"message": "Shift swap was completed successfully"}), 200
+
+    notification = Notification_messages(
+        user_id=initial_shift_data.user_id, message=f"A group member requested to take shift at {membership.group.name} from {initial_shift_data.start_time.strftime()} to {initial_shift_data.end_time.strftime()} via a shift swap request, awaiting admin approval.")
 
     return jsonify({"message": "Shift swap request linked successfully awaiting admin approval"}), 200
 
@@ -645,6 +703,8 @@ def approve_shift_swap(membership_id, shift_id, swap_id):
     if shift_swap == None:
         return jsonify({"message": "Swap not found"}), 404
 
+    initial_shift_data = shift.get_details()
+
     shift_swap.approved_by_admin_id = user.id
 
     db.session.add(shift_swap)
@@ -669,14 +729,22 @@ def approve_shift_swap(membership_id, shift_id, swap_id):
         db.session.delete(end_overlaping_shift)
         shift.end_time = end_overlaping_shift.end_time
 
+    previous_owner_notification = Notification_messages(
+        user_id=initial_shift_data.user_id, message=f"Your shift at {membership.group.name} from {initial_shift_data.start_time.strftime()} to {initial_shift_data.end_time.strftime()} was unassigned via a shift swap request.")
+    new_owner_notification = Notification_messages(
+        user_id=shift.user_id, message=f"You've been assigned a new shift at {membership.group.name} from {shift.start_time.strftime()} to {shift.end_time.strftime()} via a shift swap request.")
+
     shift.user_id = user.id
+
     db.session.add(shift)
+    db.session.add(previous_owner_notification)
+    db.session.add(new_owner_notification)
     db.session.commit()
 
     return jsonify({"message": "Shift swap was successfully approved"}), 200
 
 
-@app.route('/user/groups/memberships/<membership_id>/shift/<shift_id>/shift-swap/<swap_id>/approve', methods=["DELETE"])
+@app.route('/user/groups/memberships/<membership_id>/shift/<shift_id>/shift-swap/<swap_id>/decline', methods=["DELETE"])
 @login_required
 def decline_shift_swap(membership_id, shift_id, swap_id):
     user = g.user
@@ -714,7 +782,12 @@ def decline_shift_swap(membership_id, shift_id, swap_id):
 
     if user_is_new_shift_owner:
         shift_swap.new_owner_id = None
+
+        notification = Notification_messages(
+            user_id=shift.assigned_owner.id, message=f"Your shift swap request at {membership.group.name} from {shift.start_time.strftime()} to {shift.end_time.strftime()}, failed because the group member removed their request.")
+
         db.session.add(shift_swap)
+        db.session.add(notification)
         return jsonify({"message": "You have been successfully unlinked from the shift swap"}), 204
 
     body = request.get_json()
@@ -725,11 +798,25 @@ def decline_shift_swap(membership_id, shift_id, swap_id):
 
     if delete_request == True:
         db.session.delete(shift_swap)
+
+        if not user_is_current_shift_owner:
+            notification = Notification_messages(
+                user_id=shift.assigned_owner.id, message=f"Your shift swap request at {membership.group.name} from {shift.start_time.strftime()} to {shift.end_time.strftime()}, failed because it was removed by an admin.")
+
+            db.session.add(notification)
+
         db.session.commit()
         return jsonify({"message": "You have been successfully deleted the shift swap request"}), 204
     else:
         shift_swap.new_owner_id = None
         db.session.add(shift_swap)
+
+        if not user_is_current_shift_owner:
+            notification = Notification_messages(
+                user_id=shift.assigned_owner.id, message=f"Your shift swap request at {membership.group.name} from {shift.start_time.strftime()} to {shift.end_time.strftime()}, failed because it was declined by an admin.")
+
+            db.session.add(notification)
+
         db.session.commit()
         return jsonify({"message": "You have been successfully declined the shift swap request"}), 204
 
