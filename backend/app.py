@@ -5,6 +5,10 @@ from flask_debugtoolbar import DebugToolbarExtension
 from authlib.integrations.flask_client import OAuth
 from models import db, connect_db, User, Group, GroupMembership, Shift, Shift_swap, Notification_messages
 from auth_decorator import login_required
+from flask_bcrypt import Bcrypt
+import jwt
+import random
+import string
 from datetime import date, datetime, timezone, timedelta
 import requests
 import os
@@ -22,6 +26,9 @@ app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 toolbar = DebugToolbarExtension(app)
 
 connect_db(app)
+
+bcrypt = Bcrypt()
+SECRET_KEY = os.getenv("secretKey")
 
 # OAuth Setup
 oauth = OAuth(app)
@@ -57,6 +64,98 @@ def home():
     return f'Hello, you are logged in as {g.user.email}!'
 
 
+@app.route('/login', methods=["GET"])
+def login_host():
+    body = request.get_json()
+    email = body.get("email")
+    password = body.get("password")
+
+    if email == None or password == None:
+        return jsonify({"message": "Required parameters are missing"}), 400
+
+    user = User.query.filter_by(
+        google_openid=None, microsoft_openid=None, email=email).one_or_none()
+
+    if user == None:
+        return jsonify({
+            "message": "A user for this account does not exist"
+        }), 401
+
+    authorized = bcrypt.check_password_hash(user.password, password)
+    if not authorized:
+        return jsonify({
+            "message": "Email and password combination not valid"
+        }), 401
+
+    # Create the JWT payload
+    payload = {
+        "user_id": user.id,
+        # Token expires in 3 hour
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+    }
+
+    # Encode the JWT
+    token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+    # Store token into session
+    session['access_token'] = token
+    session['auth_type'] = 'Host'
+
+    return redirect('/')
+
+
+@app.route('/signup', methods=["GET"])
+def signup_host():
+    body = request.get_json()
+    username = body.get("username")
+    email = body.get("email")
+    password = body.get("password")
+    confirm_password = body.get("confirm_password")
+
+    if username == None or email == None or password == None or confirm_password == None:
+        return jsonify({"message": "Required parameters are missing"}), 400
+
+    user = User.query.filter_by(
+        google_openid=None, microsoft_openid=None, email=email).one_or_none()
+
+    if user != None:
+        return jsonify({
+            "message": "A user for this email already exists"
+        }), 401
+
+    if password != confirm_password:
+        return jsonify({"message": "password does not match password confirmation"}), 400
+
+    password_hash = bcrypt.generate_password_hash(password).decode('UTF-8')
+
+    new_user = User(
+        username=username.replace(" ", "_"),
+        email=email,
+        password_hash=password_hash
+    )
+    db.session.add(new_user)
+    db.session.commit()
+
+    # Create the JWT payload
+    payload = {
+        "user_id": new_user.id,
+        # Token expires in 3 hour
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+    }
+
+    # Encode the JWT
+    token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+    # Store token into session
+    session['access_token'] = token
+    session['auth_type'] = 'Host'
+
+    # Make the session permanent so it persists after the browser is closed
+    session.permanent = True
+
+    return redirect('/')
+
+
 @app.route('/login-google', methods=["GET"])
 def login_google():
     redirect_uri = url_for('login_google_callback', _external=True)
@@ -77,13 +176,17 @@ def login_google_callback():
     # Retrieve user information
     user_info = google.userinfo()
 
-    user_exists = User.query.filter_by(
-        google_openid=user_info.get("sub")).one_or_none() != None
+    user = User.query.filter_by(
+        google_openid=user_info.get("sub")).one_or_none()
 
-    if user_exists:
-        # Store token into session (access and refresh tokens)
-        session['access_token'] = token.get('access_token')
-        session['auth_type'] = 'Google'
+    if user == None:
+        return jsonify({
+            "message": "A user for this account does not exist"
+        }), 401
+
+    # Store token into session
+    session['access_token'] = token.get('access_token')
+    session['auth_type'] = 'Google'
 
     # Make the session permanent so it persists after the browser is closed
     session.permanent = True
@@ -99,16 +202,19 @@ def signup_google_callback():
     # Retrieve user information
     user_info = google.userinfo()
 
-    user_exists = User.query.filter_by(
-        google_openid=user_info.get("sub")).one_or_none() != None
+    user = User.query.filter_by(
+        google_openid=user_info.get("sub")).one_or_none()
 
-    if not user_exists:
-        new_user = User(email=user_info.get("email"),
-                        google_openid=user_info.get("sub"))
+    if user == None:
+        new_user = User(
+            username=user_info.get("name").replace(" ", "_"),
+            email=user_info.get("email"),
+            google_openid=user_info.get("sub")
+        )
         db.session.add(new_user)
         db.session.commit()
 
-    # Store token into session (access and refresh tokens)
+    # Store token into session
     session['access_token'] = token.get('access_token')
     session['auth_type'] = 'Google'
 
@@ -140,13 +246,17 @@ def login_microsoft_callback():
     resp = microsoft.get('me')
     user_info = resp.json()
 
-    user_exists = User.query.filter_by(
-        microsoft_openid=user_info.get("id")).one_or_none() is not None
+    user = User.query.filter_by(
+        microsoft_openid=user_info.get("id")).one_or_none()
 
-    if user_exists:
-        # Store token into session (access and refresh tokens)
-        session['access_token'] = token.get('access_token')
-        session['auth_type'] = 'Microsoft'
+    if user == None:
+        return jsonify({
+            "message": "A user for this account does not exist"
+        }), 401
+
+    # Store token into session
+    session['access_token'] = token.get('access_token')
+    session['auth_type'] = 'Microsoft'
 
     # Make the session permanent so it persists after the browser is closed
     session.permanent = True
@@ -163,18 +273,22 @@ def signup_microsoft_callback():
     resp = microsoft.get('me')
     user_info = resp.json()
 
-    user_exists = User.query.filter_by(
-        microsoft_openid=user_info.get("id")).one_or_none() is not None
+    user = User.query.filter_by(
+        microsoft_openid=user_info.get("id")).one_or_none()
 
-    if not user_exists:
+    if user == None:
         new_user = User(
+            username=user_info.get("displayName",
+                                   # If there is no username available a random 10 character string will be assigned as the username
+                                   ''.join(random.choices(
+                                       string.ascii_letters + string.digits, k=10))).replace(" ", "_"),
             email=user_info.get("mail") or user_info.get("userPrincipalName"),
             microsoft_openid=user_info.get("id")
         )
         db.session.add(new_user)
         db.session.commit()
 
-    # Store token into session (access and refresh tokens)
+    # Store token into session
     session['access_token'] = token.get('access_token')
     session['auth_type'] = 'Microsoft'
 
