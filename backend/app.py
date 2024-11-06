@@ -12,6 +12,7 @@ import string
 from datetime import date, datetime, timezone, timedelta
 import requests
 import os
+from flask_cors import CORS
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +23,17 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = True
 app.config['SECRET_KEY'] = os.getenv("secretKey")
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
+
+redirect_url = os.getenv('AUTH_REDIRECT_URL') or '/'
+
+# Initialize CORS
+frontend_url = os.getenv('FRONTEND_URL')
+if not frontend_url:
+    raise ValueError("FRONTEND_URL environment variable not set")
+
+CORS(app, resources={
+     r"/*": {"origins": ["http://localhost:5173"]}}, supports_credentials=True)
+
 
 toolbar = DebugToolbarExtension(app)
 
@@ -64,7 +76,7 @@ def home():
     return f'Hello, you are logged in as {g.user.email}!'
 
 
-@app.route('/login', methods=["GET"])
+@app.route('/login', methods=["POST"])
 def login_host():
     body = request.get_json()
     email = body.get("email")
@@ -101,10 +113,10 @@ def login_host():
     session['access_token'] = token
     session['auth_type'] = 'Host'
 
-    return redirect('/')
+    return jsonify({"message": "login successful"})
 
 
-@app.route('/signup', methods=["GET"])
+@app.route('/signup', methods=["POST"])
 def signup_host():
     body = request.get_json()
     username = body.get("username")
@@ -138,9 +150,9 @@ def signup_host():
 
     # Create the JWT payload
     payload = {
-        "user_id": new_user.id,
+        "user_id": str(new_user.id),
         # Token expires in 3 hour
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+        "exp": datetime.utcnow() + timedelta(hours=3)
     }
 
     # Encode the JWT
@@ -153,7 +165,7 @@ def signup_host():
     # Make the session permanent so it persists after the browser is closed
     session.permanent = True
 
-    return redirect('/')
+    return jsonify({"message": "registration successful"})
 
 
 @app.route('/login-google', methods=["GET"])
@@ -191,7 +203,7 @@ def login_google_callback():
     # Make the session permanent so it persists after the browser is closed
     session.permanent = True
 
-    return redirect('/')
+    return redirect(redirect_url)
 
 
 @app.route('/signup-google/callback', methods=["GET"])
@@ -221,7 +233,7 @@ def signup_google_callback():
     # Make the session permanent so it persists after the browser is closed
     session.permanent = True
 
-    return redirect('/')
+    return redirect(redirect_url)
 
 
 # Microsoft OAuth Routes
@@ -261,7 +273,7 @@ def login_microsoft_callback():
     # Make the session permanent so it persists after the browser is closed
     session.permanent = True
 
-    return redirect('/')
+    return redirect(redirect_url)
 
 
 @app.route('/signup-microsoft/callback', methods=["GET"])
@@ -295,7 +307,7 @@ def signup_microsoft_callback():
     # Make the session permanent so it persists after the browser is closed
     session.permanent = True
 
-    return redirect('/')
+    return redirect(redirect_url)
 
 
 @app.route('/logout', methods=["GET"])
