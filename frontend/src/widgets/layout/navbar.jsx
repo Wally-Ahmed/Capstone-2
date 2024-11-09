@@ -1,6 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Navbar as MTNavbar,
   MobileNav,
@@ -9,9 +9,24 @@ import {
   IconButton,
 } from "@material-tailwind/react";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
+import { backendURL } from '@/config';
 
-export function Navbar({ brandName, routes, action }) {
+export function Navbar({ brandName, routes, authorized }) {
+
+  const { pathname } = useLocation();
+
   const [openNav, setOpenNav] = React.useState(false);
+
+  const doLogout = async () => {
+    const res = await fetch(`${backendURL}/logout`, {
+      method: 'GET',
+      credentials: 'include', // Include cookies in the request
+    });
+
+    if (res.ok) {
+      window.location.reload();
+    }
+  }
 
   React.useEffect(() => {
     window.addEventListener(
@@ -70,17 +85,43 @@ export function Navbar({ brandName, routes, action }) {
         </Link>
         <div className="hidden lg:block">{navList}</div>
         <div className="hidden gap-2 lg:flex">
-          <Link
-            to="/login"
 
-          >
-            <Button variant="text" size="sm" color="white" fullWidth>
-              Login
+          {authorized == true && <>
+            <Button variant="text" size="sm" color="white" onClick={doLogout} fullWidth>
+              Logout
             </Button>
-          </Link>
-          {React.cloneElement(action, {
-            className: "hidden lg:inline-block",
-          })}
+            {pathname === '/app'
+              ? <></>
+              : (
+                <Link
+                  to="/app"
+
+                >
+                  <Button variant="gradient" size="sm" fullWidth>
+                    Dashboard
+                  </Button>
+                </Link>
+              )}
+
+          </>}
+          {authorized == false && <>
+            <Link
+              to="/login"
+
+            >
+              <Button variant="text" size="sm" color="white" fullWidth>
+                Login
+              </Button>
+            </Link>
+            <Link
+              to="/sign-up"
+            >
+              <Button variant="gradient" size="sm" fullWidth>
+                Sign-Up
+              </Button>
+            </Link>
+          </>}
+
         </div>
         <IconButton
           variant="text"
@@ -102,18 +143,43 @@ export function Navbar({ brandName, routes, action }) {
       >
         <div className="container mx-auto">
           {navList}
-          <Link
-            to="/login"
 
-            className="mb-2 block"
-          >
-            <Button variant="text" size="sm" fullWidth>
-              Login
+          {authorized === true && <>
+            <Button variant="text" size="sm" className="mb-2 border" onClick={doLogout} fullWidth>
+              Logout
             </Button>
-          </Link>
-          {React.cloneElement(action, {
-            className: "w-full block",
-          })}
+            {pathname === "/app"
+              ? <></>
+              : (
+                <Link
+                  to="/app"
+
+                  className="mb-2 block"
+                >
+                  <Button variant="gradient" size="sm" fullWidth>
+                    Dashboard
+                  </Button>
+                </Link>
+              )}
+          </>}
+          {authorized === false && <>
+            <Link
+              to="/login"
+
+              className="mb-2 block"
+            >
+              <Button variant="text" size="sm" fullWidth>
+                Login
+              </Button>
+            </Link>
+            <Link
+              to="/sign-up"
+            >
+              <Button variant="gradient" size="sm" fullWidth>
+                Sign-Up
+              </Button>
+            </Link>
+          </>}
         </div>
       </MobileNav>
     </MTNavbar>
@@ -122,15 +188,7 @@ export function Navbar({ brandName, routes, action }) {
 
 Navbar.defaultProps = {
   brandName: "TeamShyft",
-  action: (
-    <Link
-      to="/sign-up"
-    >
-      <Button variant="gradient" size="sm" fullWidth>
-        Sign-Up
-      </Button>
-    </Link>
-  ),
+  authorized: null,
 };
 
 Navbar.propTypes = {

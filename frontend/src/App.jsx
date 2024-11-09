@@ -1,21 +1,50 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Navbar } from "@/widgets/layout";
 import routes from "@/routes";
-import { Home, Profile, SignIn, SignUp, Contact } from "@/pages";
+import { Home, Profile, SignIn, SignUp, Contact, TeamShyft } from "@/pages";
+import React, { useState, useEffect } from 'react';
+import { backendURL } from '@/config';
 
 
 function App() {
   const { pathname } = useLocation();
 
+  // State to manage authorized status
+  const [isAuthorized, setIsAuthorize] = useState(null);
+
+  // Check if the user is already authenticated
+  useEffect(() => {
+    const checkAuthentication = async () => {
+      try {
+        const res = await fetch(`${backendURL}/user`, {
+          method: 'GET',
+          credentials: 'include', // Include cookies in the request
+        });
+
+        if (res.ok) {
+          setIsAuthorize(true);
+        } else {
+          setIsAuthorize(false);
+        }
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+        setIsAuthorize(false);
+      }
+    };
+
+    checkAuthentication();
+  }, []);
+
   return (
     <>
       {!(pathname == '/login' || pathname == '/sign-up') && (
         <div className="container absolute left-2/4 z-10 mx-auto -translate-x-2/4 p-4">
-          <Navbar routes={routes} />
+          <Navbar routes={routes} authorized={isAuthorized} />
         </div>
       )
       }
       <Routes>
+        <Route path="/app" element={<TeamShyft />} />
         <Route path="/home" element={<Home />} />
         <Route path="/blog" element={<Profile />} />
         <Route path="/support" element={<Contact />} />

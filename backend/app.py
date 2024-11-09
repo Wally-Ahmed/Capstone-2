@@ -326,13 +326,25 @@ def logout():
     return jsonify({"message": "Logout successful"}), 200
 
 
+@app.route('/user', methods=["GET"])
+@login_required
+def get_user_info():
+    user = g.user
+
+    return jsonify({
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email
+        },
+    })
+
+
 @app.route('/user/notifications', methods=["GET"])
 @login_required
 def get_user_notifications():
     user = g.user
 
-    for key in list(session.keys()):
-        session.pop(key)
     return jsonify({
         "notifications": [notification.get_details() for notification in user.notifications],
         "unread_notifications": [notification.get_details() for notification in user.unread_notifications]

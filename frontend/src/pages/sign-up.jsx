@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Input,
   Checkbox,
   Button,
   Typography,
+  Spinner
 } from '@material-tailwind/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { backendURL } from '@/config';
@@ -69,6 +70,42 @@ export function SignUp() {
       console.error('Error:', error);
     }
   };
+
+  // State to manage loading status
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check if the user is already authenticated
+  useEffect(() => {
+    const checkAuthentication = async () => {
+      try {
+        const res = await fetch(`${backendURL}/user`, {
+          method: 'GET',
+          credentials: 'include', // Include cookies in the request
+        });
+
+        if (res.ok) {
+          // User is authenticated, redirect to '/app'
+          navigate('/app');
+        } else {
+          // User is not authenticated, proceed to render the sign-in page
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+        setIsLoading(false);
+      }
+    };
+
+    checkAuthentication();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Spinner color="black" className="h-20 w-20 animate-spin" aria-label="Loading" />
+      </div>
+    );
+  }
 
   return (
     <section className="m-8 flex">

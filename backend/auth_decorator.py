@@ -5,7 +5,12 @@ import requests
 import jwt
 from jwt import DecodeError, ExpiredSignatureError, InvalidTokenError
 from datetime import datetime, timedelta
-from config import SECRET_KEY  # Import your secret key
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+secretKey = os.getenv("secretKey")
 
 
 def login_required(f):
@@ -22,7 +27,7 @@ def login_required(f):
             try:
                 # Decode the JWT token
                 payload = jwt.decode(
-                    access_token, SECRET_KEY, algorithms=["HS256"])
+                    access_token, secretKey, algorithms=["HS256"])
                 user_id = payload.get('user_id')
 
                 if user_id is None:
