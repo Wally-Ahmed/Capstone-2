@@ -2,6 +2,10 @@ from flask import session, g, jsonify
 from models import User
 from functools import wraps
 import requests
+import jwt
+from jwt import DecodeError, ExpiredSignatureError, InvalidTokenError
+from datetime import datetime, timedelta
+from config import SECRET_KEY  # Import your secret key
 
 
 def login_required(f):
@@ -14,9 +18,50 @@ def login_required(f):
             # Missing token data, throw error
             return jsonify({"message": "Token data is missing", "status": 401}), 401
 
-        headers = {'Authorization': f'Bearer {access_token}'}
+        if auth_type == "Host":
+            try:
+                # Decode the JWT token
+                payload = jwt.decode(
+                    access_token, SECRET_KEY, algorithms=["HS256"])
+                user_id = payload.get('user_id')
 
-        if auth_type == "Google":
+                if user_id is None:
+                    # Invalid token payload
+                    session.pop('auth_type', None)
+                    session.pop('access_token', None)
+                    return jsonify({"message": "Invalid token", "status": 401}), 401
+
+                # Fetch user from database using user_id
+                user = User.query.filter_by(id=user_id).one_or_none()
+
+                if user is None:
+                    # User does not exist
+                    session.pop('auth_type', None)
+                    session.pop('access_token', None)
+                    return jsonify({"message": "User does not exist", "status": 401}), 401
+
+                # Store user info in Flask's g object
+                g.user = user
+                return f(*args, **kwargs)
+
+            except ExpiredSignatureError:
+                # Token has expired
+                session.pop('auth_type', None)
+                session.pop('access_token', None)
+                return jsonify({"message": "Token has expired", "status": 401}), 401
+            except (DecodeError, InvalidTokenError):
+                # Token is invalid
+                session.pop('auth_type', None)
+                session.pop('access_token', None)
+                return jsonify({"message": "Invalid token", "status": 401}), 401
+            except Exception as e:
+                # Handle any other exceptions
+                session.pop('auth_type', None)
+                session.pop('access_token', None)
+                return jsonify({"message": "An error occurred", "status": 401}), 401
+
+        elif auth_type == "Google":
+            headers = {'Authorization': f'Bearer {access_token}'}
             response = requests.get(
                 'https://openidconnect.googleapis.com/v1/userinfo',
                 headers=headers
@@ -43,6 +88,7 @@ def login_required(f):
                 return jsonify({"message": "Invalid or expired token", "status": 401}), 401
 
         elif auth_type == "Microsoft":
+            headers = {'Authorization': f'Bearer {access_token}'}
             response = requests.get(
                 'https://graph.microsoft.com/v1.0/me',
                 headers=headers
