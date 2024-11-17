@@ -351,6 +351,19 @@ def get_user_notifications():
     })
 
 
+@app.route('/user/notifications/read-all', methods=["POST"])
+@login_required
+def read_all_notifications():
+    user = g.user
+
+    for notification in g.user.unread_notifications:
+        notification.read = True
+        db.session.add(notification)
+    db.session.commit()
+
+    return jsonify({"message": "All notifications marked as read."}), 200
+
+
 @app.route('/user/groups', methods=["GET", "POST"])
 @login_required
 def list_groups():

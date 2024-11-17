@@ -10,6 +10,7 @@ function App() {
   const { pathname } = useLocation();
 
   // State to manage authorized status
+  const [user, setUser] = useState(null);
   const [isAuthorized, setIsAuthorize] = useState(null);
 
   // Check if the user is already authenticated
@@ -22,6 +23,8 @@ function App() {
         });
 
         if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
           setIsAuthorize(true);
         } else {
           setIsAuthorize(false);
@@ -39,7 +42,7 @@ function App() {
     <>
       {!(pathname == '/login' || pathname == '/sign-up') && (
         <div className="container absolute left-2/4 z-10 mx-auto -translate-x-2/4 p-4">
-          <Navbar routes={routes} authorized={isAuthorized} />
+          <Navbar routes={routes} user={user} authorized={isAuthorized} />
         </div>
       )
       }

@@ -10,6 +10,8 @@ export function TeamShyft() {
   // State to manage loading status
   const [isLoading, setIsLoading] = useState(true);
 
+  const [selectedGroup, setSelectedGroup] = useState(null);
+
   // Check if the user is authenticated
   useEffect(() => {
     const checkAuthentication = async () => {
@@ -20,12 +22,15 @@ export function TeamShyft() {
         });
 
         if (!res.ok) {
-          // User is authenticated, redirect to '/home'
+          // User isn't authenticated, redirect to '/home'
           navigate('/home');
+        }
+        else {
+          setIsLoading(false)
         }
       } catch (error) {
         console.error('Error checking authentication:', error);
-        setIsLoading(false);
+        navigate('/home');
       }
     };
 
@@ -34,14 +39,37 @@ export function TeamShyft() {
 
   if (isLoading) {
     return (
+      <>
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center">
+          <div className="absolute top-0 h-full w-full bg-black bg-cover bg-center" />
+          <div className="absolute top-0 h-full w-full bg-[url('/img/background-3.png')] bg-cover bg-center" />
+        </div>
+        <div className="fixed inset-0 flex items-center justify-center mt-[8%]">
+          <div className="absolute h-[80vh] w-[90%] bg-gray-900 rounded-xl shadow-lg" />
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
       <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center">
         <div className="absolute top-0 h-full w-full bg-black bg-cover bg-center" />
         <div className="absolute top-0 h-full w-full bg-[url('/img/background-3.png')] bg-cover bg-center" />
       </div>
-    );
-  }
-
-  return <></>
+      <div className="fixed inset-0 flex items-center justify-center mt-[8%]">
+        <div className="absolute h-[80vh] w-[90%] bg-gray-900 rounded-xl shadow-lg" >
+          <div className="fixed inset-0 flex items-center justify-center mt-[8%]">
+            {
+              selectedGroup
+                ? <></>
+                : <></>
+            }
+          </div>
+        </div>
+      </div>
+    </>
+  )
 }
 
 export default TeamShyft;
