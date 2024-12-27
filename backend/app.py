@@ -366,15 +366,14 @@ def read_all_notifications():
 
 @app.route('/user/groups', methods=["GET", "POST"])
 @login_required
-def list_groups():
+def list_all_or_create_group():
     user = g.user
 
     if request.method == "GET":
-        for key in list(session.keys()):
-            session.pop(key)
         return jsonify({
-            "owned_groups": [group.get_details() for group in user.owned_groups],
-            "groups": [group.get_details() for group in user.groups]
+            "all_groups": [group.get_details() for group in user.groups],
+            "my_groups": [group.get_details() for group in user.my_groups],
+            "available_groups": [group.get_details() for group in user.available_groups],
         })
     elif request.method == "POST":
         body = request.get_json()
@@ -385,7 +384,7 @@ def list_groups():
         db.session.commit()
 
         admin = GroupMembership(
-            user_id=user.id, group_id=new_group.id, admin=False, approved=False)
+            user_id=user.id, group_id=new_group.id, admin=True, approved=True)
         db.session.add(admin)
         db.session.commit()
 
@@ -399,19 +398,32 @@ def get_group_info(group_id):
 
     group = Group.query.filter_by(id=group_id).one_or_none()
 
-    if group == None:
+    if group is None:
         return jsonify({"message": "Group not found"}), 404
 
-    matching_instance = next(
-        (group for group in user.groups if group.id == group_id), None)
-    if not matching_instance:
-        return jsonify({"message": "You not not have permission to view this group"}), 401
-    if not matching_instance.approved:
-        return jsonify({"message": "You not not have permission to view this group"}), 401
+    # Query the GroupMembership table
+    membership = GroupMembership.query.filter_by(
+        user_id=user.id, group_id=group_id).first()
+
+    if not membership:
+        return jsonify({"message": "You do not have permission to view this group"}), 401
+
+    if not membership.approved:
+        return jsonify({"message": "Your membership in this group is not approved"}), 401
+
+    role = ''
+    if group.owner.id == user.id:
+        role = 'owner'
+    elif membership.admin == True:
+        role = 'admin'
+    else:
+        role = 'employee'
 
     return jsonify({
         "shifts": [shift.get_details() for shift in group.recent_shifts],
-        "members": [user.get_details() for user in group.members]
+        "members": [member.get_details() for member in group.members],
+        "membership_requests": [member.get_details() for member in group.membership_requests],
+        "role": role
     }), 200
 
 

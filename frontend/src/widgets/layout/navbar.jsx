@@ -85,8 +85,8 @@ export function Navbar({ brandName, routes, user, authorized }) {
       await getNotifications();
 
     } catch (error) {
-      console.error('Error checking notifications:', error);
-      alert('Error checking notifications, please refresh the page.');
+      console.error('Session Expired', error);
+      alert('Your login session has expired, please refresh your credentials.');
     }
   };
 
@@ -155,22 +155,23 @@ export function Navbar({ brandName, routes, user, authorized }) {
               <>
                 {/* Profile Icon and Username */}
                 <button type="button" onClick={() => { setShowProfileTab(true); }}>
-                  <div className="flex items-center gap-2 mr-4">
-                    {/* Avatar with Red Dot Indicator */}
-                    <div className="relative">
-                      <Avatar
-                        src="/img/profile.webp" // Placeholder image path
-                        alt="Profile"
-                        size="lg"
-                      />
-                      {newNotificationsAvailable && (
-                        <span className="absolute top-0 right-0 block h-3 w-3 rounded-full ring-1 ring-black bg-red-500"></span>
-                      )}
-                    </div>
-                    <Typography variant="small" className="font-bold">
-                      {user?.username || 'Username'}
-                    </Typography>
-                  </div>
+                  {pathname === '/app' &&
+                    < div className="flex items-center gap-2 mr-4">
+                      {/* Avatar with Red Dot Indicator */}
+                      <div className="relative">
+                        <Avatar
+                          src="/img/profile.webp" // Placeholder image path
+                          alt="Profile"
+                          size="lg"
+                        />
+                        {newNotificationsAvailable && (
+                          <span className="absolute top-0 right-0 block h-3 w-3 rounded-full ring-1 ring-black bg-red-500"></span>
+                        )}
+                      </div>
+                      <Typography variant="small" className="font-bold">
+                        {user?.username || 'Username'}
+                      </Typography>
+                    </div>}
                 </button>
                 <Button
                   variant="text"
@@ -208,22 +209,23 @@ export function Navbar({ brandName, routes, user, authorized }) {
           <div className="flex items-center lg:hidden">
             {authorized === true && (
               <button type="button" onClick={() => { setShowProfileTab(true); }}>
-                <div className="flex items-center gap-2 mr-4">
-                  {/* Avatar with Red Dot Indicator */}
-                  <div className="relative">
-                    <Avatar
-                      src="/img/profile.webp"
-                      alt="Profile"
-                      size="lg"
-                    />
-                    {newNotificationsAvailable && (
-                      <span className="absolute top-0 right-0 block h-3 w-3 rounded-full ring-1 ring-black bg-red-500"></span>
-                    )}
-                  </div>
-                  <Typography variant="small" className="font-bold">
-                    {user?.username || 'Username'}
-                  </Typography>
-                </div>
+                {pathname === '/app' &&
+                  <div className="flex items-center gap-2 mr-4">
+                    {/* Avatar with Red Dot Indicator */}
+                    <div className="relative">
+                      <Avatar
+                        src="/img/profile.webp"
+                        alt="Profile"
+                        size="lg"
+                      />
+                      {newNotificationsAvailable && (
+                        <span className="absolute top-0 right-0 block h-3 w-3 rounded-full ring-1 ring-black bg-red-500"></span>
+                      )}
+                    </div>
+                    <Typography variant="small" className="font-bold">
+                      {user?.username || 'Username'}
+                    </Typography>
+                  </div>}
               </button>
             )}
             <IconButton
@@ -284,18 +286,20 @@ export function Navbar({ brandName, routes, user, authorized }) {
             )}
           </div>
         </MobileNav>
-      </MTNavbar>
+      </MTNavbar >
 
       {/* Render the ProfileTab component when showProfileTab is true */}
-      {showProfileTab && (
-        <ProfileTab
-          user={user}
-          notifications={notifications}
-          closeProfileTab={() => setShowProfileTab(false)}
-          getNotifications={getNotifications}
-          showProfileTab={showProfileTab}
-        />
-      )}
+      {
+        showProfileTab && (
+          <ProfileTab
+            user={user}
+            notifications={notifications}
+            closeProfileTab={() => setShowProfileTab(false)}
+            getNotifications={getNotifications}
+            showProfileTab={showProfileTab}
+          />
+        )
+      }
     </>
   );
 }

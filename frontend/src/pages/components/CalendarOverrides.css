@@ -1,0 +1,102 @@
+/* CalendarOverrides.css */
+
+/* Force all outlines and text to black unless overridden */
+* {
+    outline: #000;
+}
+
+/* Overall text color */
+.rbc-calendar {
+    color: #000 !important;
+}
+
+/* Headers, day cells, off-range cells */
+.rbc-header,
+.rbc-time-header,
+.rbc-time-header-cell,
+.rbc-resource-header,
+.rbc-date-cell,
+.rbc-off-range,
+.rbc-row,
+.rbc-month-row,
+.rbc-time-header-content,
+.rbc-row-content,
+.rbc-time-gutter,
+.rbc-time-header-gutter,
+.rbc-day-slot,
+.rbc-time-column {
+    color: #000 !important;
+    /* border: 1px solid #000 !important; */
+    outline: #000 !important;
+    box-shadow: none !important;
+}
+
+/* Even more thorough: force RBC root children to black border */
+.rbc-root * {
+    border-color: #000 !important;
+    outline: #000 !important;
+    box-shadow: none !important;
+}
+
+/* Event text black, custom background, no explicit border */
+.rbc-event {
+    color: #000 !important;
+    background-color: #30bce7 !important;
+    border-radius: 4px;
+    padding: 2px;
+    margin: -1px;
+}
+
+/* Show-more link when day has overflowed events in month view */
+.rbc-show-more {
+    color: #30bce7 !important;
+    /* Ensure the "show more" link is black text */
+}
+
+.rbc-show-more:hover {
+    color: #ffffff !important;
+}
+
+/* Off-range background (days in previous/next month) */
+.rbc-off-range-bg {
+    background-color: #3e3e3e;
+}
+
+/* Selected or 'today' cells in a gray shade */
+.rbc-selected-cell,
+.rbc-today {
+    background-color: #979797 !important;
+    color: #000 !important;
+}
+
+/* Specifically for the current day in month view */
+.rbc-date-cell.rbc-now,
+.rbc-day-bg.rbc-now {
+    background-color: #979797 !important;
+    color: #000 !important;
+}
+
+/* Hovered event background */
+.rbc-event:hover {
+    background-color: #eee !important;
+}
+
+/* Current time indicator (day/week views) black or red */
+.rbc-current-time-indicator {
+    background-color: #ff0000 !important;
+    height: 2px;
+}
+
+/* Custom class for "x"ed-off days */
+.xedOffDay {
+    background-color: rgba(255, 0, 0, 0.2) !important;
+    /* Example: diagonal stripes to show it's blocked */
+    background-image:
+        repeating-linear-gradient(135deg,
+            transparent,
+            transparent 5px,
+            rgba(255, 0, 0, 0.4) 5px,
+            rgba(255, 0, 0, 0.4) 10px) !important;
+    color: #333 !important;
+    /* Or any other visual override you like */
+}

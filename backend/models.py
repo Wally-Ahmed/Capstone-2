@@ -20,7 +20,7 @@ class User(db.Model):
     microsoft_openid = db.Column(db.String(50), unique=True, nullable=True)
 
     # Relationships
-    owned_groups = db.relationship('Group', back_populates='owner', lazy=True)
+    my_groups = db.relationship('Group', back_populates='owner', lazy=True)
     groups = db.relationship(
         'Group',
         secondary='group_memberships',
@@ -30,7 +30,7 @@ class User(db.Model):
     notifications = db.relationship(
         'Notification_messages',
         back_populates='user',
-        lazy=True,
+        lazy='dynamic',
         cascade='all, delete-orphan',
         passive_deletes=True
     )
@@ -49,14 +49,19 @@ class User(db.Model):
 
     @property
     def unread_notifications(self):
-        return self.shifts.filter(not Notification_messages.read)
+        return self.notifications.filter(not Notification_messages.read)
+
+    @property
+    def available_groups(self):
+        return self.groups.filter(Group.owner_id != self.id)
 
     # Methods
 
     def get_details(self):
         return {
             "id": self.id,
-            "email": self.email
+            "email": self.email,
+            "username": self.username
         }
 
 
@@ -104,7 +109,7 @@ class Group(db.Model):
     )
 
     # Relationships
-    owner = db.relationship('User', back_populates='owned_groups')
+    owner = db.relationship('User', back_populates='my_groups')
     members = db.relationship(
         'User',
         secondary='group_memberships',
@@ -118,6 +123,10 @@ class Group(db.Model):
         cascade='all, delete-orphan',
         passive_deletes=True
     )
+
+    @property
+    def membership_requests(self):
+        return self.members.filter(GroupMembership.approved == False)
 
     @property
     def recent_shifts(self):
