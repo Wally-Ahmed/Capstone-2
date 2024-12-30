@@ -67,7 +67,7 @@ export function GroupSchedule({ selectedGroup, handleSelectGroup }) {
             )}
 
             {/* Main content: a single CalendarComponent */}
-            <div className="flex-1 bg-gray-700 flex">
+            <div className="w-[80%] flex-1 bg-gray-700 flex">
                 <CalendarComponent
                     // We pass down the "viewMode" object so the child can see:
                     //   viewMode.calanderView => 'D' | 'W' | 'M'

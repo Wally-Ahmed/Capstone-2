@@ -9,6 +9,7 @@ import './CalendarOverrides.css';  // <-- Import your overrides globally
 // date-fns helpers
 import { add, sub, isSameDay, startOfWeek, endOfWeek, format } from 'date-fns';
 import { DayEventsPreview } from './DayEventsPreview';
+import GroupDayRBC from './GroupDayRBC';
 
 // Convert moment to RBC localizer
 const localizer = momentLocalizer(moment);
@@ -32,6 +33,29 @@ export function CalendarComponent({
         M: Views.MONTH,
     };
     const rbcView = rbcViewMap[viewMode.calanderView] || Views.WEEK;
+
+
+    const onSelectEvent = (event) => {
+        alert(`Selected event: ${event.title}`)
+    }
+
+    const onSelectSlot = (slotInfo) => {
+        if (viewMode.calanderView !== 'M') { return }
+        alert(
+            `Selected date cell: ` +
+            `${slotInfo.start.toDateString()} - ` +
+            `${slotInfo.end.toDateString()}`
+        );
+        setShowDayPreview(true);
+    }
+
+    const onShowMore = (events, date) => {
+        alert(`Clicked "+${events.length} more" on date: ${date.toDateString()}`);
+        // Switch to Day view for that date
+        setViewMode({ ...viewMode, calanderView: 'D' });
+        setCurrentDate(date);
+    }
+
 
     // Hardcoded events for development (these are your example events)
     const myEvents = [
@@ -140,52 +164,74 @@ export function CalendarComponent({
             </div>
 
             {/* The Big Calendar itself */}
-            <div className="flex-1 flex">
-                <Calendar
-                    localizer={localizer}
-                    view={rbcView}
-                    date={currentDate}
-                    // We do our own next/prev, so onNavigate can be empty or no-op
-                    onNavigate={() => { }}
-                    toolbar={false}
-                    style={{ flex: 1 }}
-                    events={!(viewMode.calanderView === 'M' && viewMode.personView === 'I') ? myEvents : []}
-                    startAccessor="start"
-                    endAccessor="end"
-                    selectable={viewMode.calanderView === 'M'}
-                    // resources={resources}
+            <div className="flex flex-col w-full h-full overflow-y-auto scrollbar scrollbar-thumb-rounded-full scrollbar-track-rounded-full scrollbar-thumb-gray-700 scrollbar-track-gray-800 pt-5 pb-[1px]">
+                <div className="flex-1 flex">
 
-                    // Hardcoded dev alerts
-                    onSelectEvent={(event) =>
-                        alert(`Selected event: ${event.title}`)
-                    }
-                    onSelectSlot={(slotInfo) => {
-                        if (viewMode.calanderView !== 'M') { return }
-                        alert(
-                            `Selected date cell: ` +
-                            `${slotInfo.start.toDateString()} - ` +
-                            `${slotInfo.end.toDateString()}`
-                        );
-                        setShowDayPreview(true);
-                    }}
-                    onShowMore={(events, date) => {
-                        alert(`Clicked "+${events.length} more" on date: ${date.toDateString()}`);
-                        // Switch to Day view for that date
-                        setViewMode({ ...viewMode, calanderView: 'D' });
-                        setCurrentDate(date);
-                    }}
+                    {(viewMode.calanderView === 'D' && viewMode.personView === 'G') && <>
+                        <GroupDayRBC
+                            localizer={localizer}
+                            view={rbcView}
+                            date={currentDate}
+                            // We do our own next/prev, so onNavigate can be empty or no-op
+                            onNavigate={() => { }}
+                            toolbar={false}
+                            style={{ flex: 1 }}
+                            events={!(viewMode.calanderView === 'M' && viewMode.personView === 'I') ? myEvents : []}
+                            startAccessor="start"
+                            endAccessor="end"
+                            resourceId="resourceId"
+                            resourceTitle="resourceTitle"
+                            selectable={viewMode.calanderView === 'M'}
+                            resources={resources}
 
-                    dayPropGetter={dayPropGetter}
-                />
+                            // Hardcoded dev alerts
+                            onSelectEvent={onSelectEvent}
+                            onSelectSlot={onSelectSlot}
+                            onShowMore={onShowMore}
+
+                            dayPropGetter={dayPropGetter}
+                        />
+                    </>}
+
+                    {!(viewMode.calanderView === 'D' && viewMode.personView === 'G') && <>
+                        <Calendar
+                            localizer={localizer}
+                            view={rbcView}
+                            date={currentDate}
+                            // We do our own next/prev, so onNavigate can be empty or no-op
+                            onNavigate={() => { }}
+                            toolbar={false}
+                            style={{ flex: 1 }}
+                            events={!(viewMode.calanderView === 'M' && viewMode.personView === 'I') ? myEvents : []}
+                            startAccessor="start"
+                            endAccessor="end"
+                            resourceId="resourceId"
+                            resourceTitle="resourceTitle"
+                            selectable={viewMode.calanderView === 'M'}
+                            // resources={resources}
+
+                            // Hardcoded dev alerts
+                            onSelectEvent={onSelectEvent}
+                            onSelectSlot={onSelectSlot}
+                            onShowMore={onShowMore}
+
+                            dayPropGetter={dayPropGetter}
+                        />
+                    </>}
+
+                </div>
             </div>
 
+
             {/* If you have a "DayEventsPreview" modal */}
-            {showDayPreview && (
-                <DayEventsPreview
-                    closeDayEventsPreview={() => setShowDayPreview(false)}
-                />
-            )}
-        </div>
+            {
+                showDayPreview && (
+                    <DayEventsPreview
+                        closeDayEventsPreview={() => setShowDayPreview(false)}
+                    />
+                )
+            }
+        </div >
     );
 }
 

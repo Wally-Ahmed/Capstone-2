@@ -1,0 +1,69 @@
+/* GroupDayRBCOverrides.css */
+
+/* Prefix everything with .group-day-rbc */
+
+/* Example: universal outline, but only within .group-day-rbc */
+.group-day-rbc * {
+    outline: #000;
+}
+
+/* RBC base calendar text color */
+.group-day-rbc .rbc-calendar {
+    color: #000 !important;
+}
+
+/* RBC headers, day cells, etc. */
+.group-day-rbc .rbc-header,
+.group-day-rbc .rbc-time-header,
+.group-day-rbc .rbc-time-header-cell,
+.group-day-rbc .rbc-resource-header,
+.group-day-rbc .rbc-date-cell,
+.group-day-rbc .rbc-off-range,
+.group-day-rbc .rbc-row,
+.group-day-rbc .rbc-month-row,
+.group-day-rbc .rbc-time-header-content,
+.group-day-rbc .rbc-row-content,
+.group-day-rbc .rbc-time-gutter,
+.group-day-rbc .rbc-time-header-gutter,
+.group-day-rbc .rbc-day-slot,
+.group-day-rbc .rbc-time-column {
+    color: #000 !important;
+    outline: #000 !important;
+    box-shadow: none !important;
+}
+
+/* Force RBC children to black border, only inside .group-day-rbc */
+.group-day-rbc .rbc-root * {
+    border-color: #000 !important;
+    outline: #000 !important;
+    box-shadow: none !important;
+}
+
+/* Event styling */
+.group-day-rbc .rbc-event {
+    color: #000 !important;
+    background-color: #30bce7 !important;
+    border-radius: 4px;
+    padding: 2px;
+    margin: -1px;
+}
+
+/* ...and so on, for every RBC override you already have. */
+
+/* Example of resource column styling (scoped) */
+.group-day-rbc .rbc-time-content>.rbc-day-slot {
+    flex: 0 0 auto !important;
+    width: 350px !important;
+    min-width: 350px !important;
+    max-width: 350px !important;
+    border: 1px solid #ddd;
+}
+
+/* Example for horizontal scroll in the top header (scoped) */
+.group-day-rbc .rbc-time-header {
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+    border: 1px solid #ddd;
+}
+
+/* etc. */
