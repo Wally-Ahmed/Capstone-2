@@ -57,6 +57,10 @@
     color: #ffffff !important;
 }
 
+.rbc-time-slot {
+    background-color: rgb(97, 97, 97) !important;
+}
+
 /* Off-range background (days in previous/next month) */
 .rbc-off-range-bg {
     background-color: #3e3e3e;
@@ -99,4 +103,8 @@
             rgba(255, 0, 0, 0.4) 10px) !important;
     color: #333 !important;
     /* Or any other visual override you like */
+}
+
+.rbc-today {
+    background-color: #979797 !important;
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'; // Import useSearchParams
+import { useNavigate, useLocation, useSearchParams, json } from 'react-router-dom'; // Import useSearchParams
 import { backendURL } from '@/config';
 import { SelectGroup } from './components/SelectGroup';
 import { GroupSchedule } from './components/GroupSchedule';
@@ -13,6 +13,7 @@ export function TeamShyft() {
   const [allGroups, setAllGroups] = useState([]);
   const [myGroups, setMyGroups] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
+  const [user, setUser] = useState(null);
 
   // Fetch user authentication and group data
   useEffect(() => {
@@ -27,6 +28,9 @@ export function TeamShyft() {
           navigate('/home');
           return;
         }
+
+        const userData = await userRes.json();
+        setUser(userData.user);
 
         // Fetch group data
         const groupsRes = await fetch(`${backendURL}/user/groups`, {
@@ -109,8 +113,8 @@ export function TeamShyft() {
       <div className="fixed inset-0 flex items-center justify-center mt-[8%]">
         <div className="absolute h-[80vh] w-[90%] bg-gray-900 rounded-xl shadow-lg overflow-hidden">
           <div className="flex h-full w-full">
-            {selectedGroup ? (
-              <GroupSchedule selectedGroup={selectedGroup} handleSelectGroup={handleSelectGroup} />
+            {(selectedGroup && user) ? (
+              <GroupSchedule selectedGroup={selectedGroup} handleSelectGroup={handleSelectGroup} user={user} />
             ) : (
               <SelectGroup
                 myGroups={myGroups}

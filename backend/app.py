@@ -403,7 +403,7 @@ def get_group_info(group_id):
 
     # Query the GroupMembership table
     membership = GroupMembership.query.filter_by(
-        user_id=user.id, group_id=group_id).first()
+        user_id=user.id, group_id=group_id).one_or_none()
 
     if not membership:
         return jsonify({"message": "You do not have permission to view this group"}), 401
@@ -420,6 +420,7 @@ def get_group_info(group_id):
         role = 'employee'
 
     return jsonify({
+        "id": group.id,
         "shifts": [shift.get_details() for shift in group.recent_shifts],
         "members": [member.get_details() for member in group.members],
         "membership_requests": [member.get_details() for member in group.membership_requests],
@@ -468,7 +469,7 @@ def approve_group_membership(membership_id):
         id=membership_id).one_or_none()
 
     if membership == None:
-        return jsonify({"message": "Request not found"}), 404
+        return jsonify({"message": "membership not found"}), 404
 
     membership.approved = True
 
@@ -497,7 +498,7 @@ def decline_group_membership(membership_id):
         id=membership_id).one_or_none()
 
     if membership == None:
-        return jsonify({"message": "Request not found"}), 404
+        return jsonify({"message": "membership not found"}), 404
 
     notification = Notification_messages(
         user_id=membership.user.id, message=f"Your membership request to {membership.group.name} has been decline.")
@@ -524,7 +525,7 @@ def edit_membership_permissions(membership_id):
         id=membership_id).one_or_none()
 
     if membership == None:
-        return jsonify({"message": "Request not found"}), 404
+        return jsonify({"message": "membership not found"}), 404
 
     user_membership = next(
         (m for m in membership.group.members if m.id == user.id), None)
@@ -547,188 +548,207 @@ def edit_membership_permissions(membership_id):
     return jsonify({"message": "Group membership permissions for this user was updated successfully"}), 200
 
 
-@app.route('/user/groups/memberships/<membership_id>/shift', methods=["POST"])
+@app.route('/user/groups/<group_id>/shift', methods=["POST"])
 @login_required
-def create_new_shift(membership_id):
+def create_new_shift(group_id):
     user = g.user
-
     body = request.get_json()
     shift_owner_membership_id = body.get("shift_owner_membership_id")
     start_time_iso = body.get("start_time_iso")
     end_time_iso = body.get("end_time_iso")
 
-    membership = GroupMembership.query.filter_by(
-        id=membership_id).one_or_none()
+    user_membership = GroupMembership.query.filter_by(
+        user_id=user.id, group_id=group_id
+    ).one_or_none()
 
-    if membership == None:
-        return jsonify({"message": "Request not found"}), 404
+    if user_membership is None:
+        return jsonify({"message": "membership not found"}), 404
 
-    user_membership = next(
-        (m for m in membership.group.members if m.id == user.id), None)
+    if not user_membership.approved:
+        return jsonify({"message": "Your membership in this group is not approved"}), 401
 
-    if user_membership == None:
-        return jsonify({"message": "You do not have a membership to this group"}), 401
+    if not user_membership.admin:
+        return jsonify({"message": "Only members with administrative access can perform this action"}), 401
 
-    user_is_admin = user_membership.admin
-
-    if not user_is_admin:
-        return jsonify({"message": "Only memebers with administative access can perform this action"}), 401
-
-    if (shift_owner_membership_id == None) or (start_time_iso == None) or (end_time_iso == None):
+    if not shift_owner_membership_id or not start_time_iso or not end_time_iso:
         return jsonify({"message": "Required parameters are missing"}), 400
 
     shift_owner_membership = GroupMembership.query.filter_by(
-        user_id=shift_owner_membership_id).one_or_none()
+        user_id=shift_owner_membership_id,
+        group_id=group_id
+    ).one_or_none()
 
-    if not shift_owner_membership:
-        return jsonify({"message": "Assigned user does not have an existing membership to this group"}), 404
+    if not shift_owner_membership or not shift_owner_membership.approved:
+        return jsonify({
+            "message": "Assigned user does not have an approved membership to this group"
+        }), 404
 
-    shift = Shift(group_id=user_membership.group.id, user_id=shift_owner_membership.user.id,
-                  start_time=date.fromisoformat(start_time_iso), end_time=date.fromisoformat(end_time_iso))
+    new_shift = Shift(
+        group_id=user_membership.group.id,
+        user_id=shift_owner_membership.user.id,
+        start_time=datetime.fromisoformat(start_time_iso),
+        end_time=datetime.fromisoformat(end_time_iso)
+    )
 
-    start_overlaping_shift = next(
-        (overlap_shift for overlap_shift in user.assigned_shifts if shift.end_time >
-         overlap_shift.start_time),
+    start_overlapping_shift = next(
+        (s for s in user.assigned_shifts if new_shift.end_time > s.start_time),
+        None
+    )
+    end_overlapping_shift = next(
+        (s for s in user.assigned_shifts if s.start_time < new_shift.end_time),
         None
     )
 
-    end_overlaping_shift = next(
-        (overlap_shift for overlap_shift in user.assigned_shifts if overlap_shift.start_time <
-         shift.end_time),
-        None
-    )
+    if start_overlapping_shift:
+        db.session.delete(start_overlapping_shift)
+        new_shift.start_time = start_overlapping_shift.start_time
 
-    if start_overlaping_shift != None:
-        db.session.delete(start_overlaping_shift)
-        shift.start_time = start_overlaping_shift.start_time
-
-    if end_overlaping_shift != None:
-        db.session.delete(end_overlaping_shift)
-        shift.end_time = end_overlaping_shift.end_time
+    if end_overlapping_shift:
+        db.session.delete(end_overlapping_shift)
+        new_shift.end_time = end_overlapping_shift.end_time
 
     notification = Notification_messages(
-        user_id=membership.user.id, message=f"You've been assigned a new shift at {membership.group.name} from {shift.start_time.strftime()} to {shift.end_time.strftime()}.")
+        user_id=shift_owner_membership.user.id,
+        message=f"You've been assigned a new shift at {user_membership.group.name} from {new_shift.start_time} to {new_shift.end_time}."
+    )
 
-    db.session.add(shift)
+    db.session.add(new_shift)
     db.session.add(notification)
     db.session.commit()
 
     return jsonify({"message": "Shift created successfully"}), 201
 
 
-@app.route('/user/groups/memberships/<membership_id>/shift/<shift_id>', methods=["PUT", "DELETE"])
+@app.route('/user/groups/<group_id>/shift/<shift_id>', methods=["PUT", "DELETE"])
 @login_required
-def modify_or_delete_shift(membership_id, shift_id):
+def modify_or_delete_shift(group_id, shift_id):
     user = g.user
 
     membership = GroupMembership.query.filter_by(
-        id=membership_id).one_or_none()
+        user_id=user.id, group_id=group_id
+    ).one_or_none()
 
-    if membership == None:
-        return jsonify({"message": "Invalid user membership id"}), 404
+    if membership is None:
+        return jsonify({"message": "membership not found"}), 404
+    if not membership.approved:
+        return jsonify({"message": "Your membership in this group is not approved"}), 401
+    if not membership.admin:
+        return jsonify({"message": "Only memebers with administrative access can perform this action"}), 401
 
-    user_membership = next(
-        (m for m in membership.group.members if m.id == user.id), None)
-
-    if user_membership == None:
-        return jsonify({"message": "You do not have a membership to this group"}), 401
-
-    user_is_admin = user_membership.admin
-
-    if not user_is_admin:
-        return jsonify({"message": "Only memebers with administative access can perform this action"}), 401
-
-    shift = Shift.query.filter_by(
-        id=shift_id).one_or_none()
-
-    if shift == None:
+    shift = Shift.query.filter_by(id=shift_id).one_or_none()
+    if shift is None:
         return jsonify({"message": "Shift not found"}), 404
 
     if request.method == "PUT":
-
         body = request.get_json()
         shift_owner_membership_id = body.get("shift_owner_membership_id")
         start_time_iso = body.get("start_time_iso")
         end_time_iso = body.get("end_time_iso")
 
-        if (shift_owner_membership_id == None) or (start_time_iso == None) or (end_time_iso == None):
+        if not shift_owner_membership_id or not start_time_iso or not end_time_iso:
             return jsonify({"message": "Required parameters are missing"}), 400
 
         shift_owner_membership = GroupMembership.query.filter_by(
-            user_id=shift_owner_membership_id).one_or_none()
+            user_id=shift_owner_membership_id, group_id=group_id
+        ).one_or_none()
 
-        if not shift_owner_membership:
-            return jsonify({"message": "Assigned user does not have an existing membership to this group"}), 404
+        if shift_owner_membership is None:
+            return jsonify({
+                "message": "Assigned user does not have an existing membership to this group"
+            }), 404
 
         initial_shift_data = shift.get_details()
-        reassign_shift_owner = shift.assigned_owner.id == shift_owner_membership_id
+        reassign_shift_owner = (shift.assigned_owner.id ==
+                                shift_owner_membership_id)
 
-        shift.group_id = user_membership.group.id
+        # FIX: parse trailing 'Z' by replacing it with '+00:00'
+        def parse_iso(iso_str):
+            if iso_str.endswith('Z'):
+                iso_str = iso_str[:-1] + '+00:00'
+            return datetime.fromisoformat(iso_str)
+
+        shift.group_id = membership.group.id
         shift.user_id = shift_owner_membership.user.id
-        shift.start_time = date.fromisoformat(start_time_iso)
-        shift.end_time = date.fromisoformat(end_time_iso)
+        shift.start_time = parse_iso(start_time_iso)
+        shift.end_time = parse_iso(end_time_iso)
 
+        # The rest of your overlap & notification logic unchanged...
         start_overlaping_shift = next(
-            (overlap_shift for overlap_shift in shift_owner_membership.user.assigned_shifts if shift.end_time >
-             overlap_shift.start_time),
+            (overlap_shift for overlap_shift in shift_owner_membership.user.assigned_shifts
+             if shift.end_time > overlap_shift.start_time),
             None
         )
-
         end_overlaping_shift = next(
-            (overlap_shift for overlap_shift in shift_owner_membership.user.assigned_shifts if overlap_shift.start_time <
-             shift.end_time),
+            (overlap_shift for overlap_shift in shift_owner_membership.user.assigned_shifts
+             if overlap_shift.start_time < shift.end_time),
             None
         )
 
-        if start_overlaping_shift != None:
+        if start_overlaping_shift is not None:
             db.session.delete(start_overlaping_shift)
             shift.start_time = start_overlaping_shift.start_time
 
-        if end_overlaping_shift != None:
+        if end_overlaping_shift is not None:
             db.session.delete(end_overlaping_shift)
             shift.end_time = end_overlaping_shift.end_time
 
         if not reassign_shift_owner:
             notification = Notification_messages(
-                user_id=shift_owner_membership.user.id, message=f"Your shift at {membership.group.name} was modified from, {initial_shift_data.start_time.strftime()} to {initial_shift_data.end_time.strftime()}, to now, {shift.start_time.strftime()} to {shift.end_time.strftime()}.")
+                user_id=shift_owner_membership.user.id,
+                message=(
+                    f"Your shift at {membership.group.name} was modified from {initial_shift_data['start_time']} "
+                    f"to {initial_shift_data['end_time']}, to now {shift.start_time} to {shift.end_time}."
+                )
+            )
             db.session.add(notification)
         else:
             previous_owner_notification = Notification_messages(
-                user_id=initial_shift_data.user_id, message=f"Your shift at {membership.group.name} from {initial_shift_data.start_time.strftime()} to {initial_shift_data.end_time.strftime()} was unassigned.")
+                user_id=initial_shift_data['user_id'],
+                message=(
+                    f"Your shift at {membership.group.name} from {initial_shift_data['start_time']} "
+                    f"to {initial_shift_data['end_time']} was unassigned."
+                )
+            )
             new_owner_notification = Notification_messages(
-                user_id=shift_owner_membership.user.id, message=f"You've been assigned a new shift at {membership.group.name} from {shift.start_time.strftime()} to {shift.end_time.strftime()}.")
-
+                user_id=shift_owner_membership.user.id,
+                message=(
+                    f"You've been assigned a new shift at {membership.group.name} "
+                    f"from {shift.start_time} to {shift.end_time}."
+                )
+            )
             db.session.add(previous_owner_notification)
             db.session.add(new_owner_notification)
 
         db.session.add(shift)
         db.session.commit()
-
         return jsonify({"message": "Shift modified successfully"}), 200
 
     elif request.method == "DELETE":
-
+        initial_shift_data = shift.get_details()
         notification = Notification_messages(
-            user_id=shift.assigned_owner.id, message=f"Your shift at {membership.group.name} from {initial_shift_data.start_time.strftime()} to {initial_shift_data.end_time.strftime()}, to now, {shift.start_time.strftime()} to {shift.end_time.strftime()} was unassigned.")
-
+            user_id=shift.assigned_owner.id,
+            message=(
+                f"Your shift at {membership.group.name} from {initial_shift_data['start_time']} "
+                f"to {initial_shift_data['end_time']} was unassigned."
+            )
+        )
         db.session.delete(shift)
         db.session.add(notification)
-
         db.session.commit()
-
         return jsonify({"message": "Shift deleted successfully"}), 204
 
 
-@app.route('/user/groups/memberships/<membership_id>/shift/<shift_id>/shift-swap', methods=["POST"])
+@app.route('/user/groups/<group_id>/shift/<shift_id>/shift-swap', methods=["POST"])
 @login_required
-def create_new_shift_swap(membership_id, shift_id):
+def create_new_shift_swap(group_id, shift_id):
     user = g.user
 
+    # Query the GroupMembership table
     membership = GroupMembership.query.filter_by(
-        id=membership_id).one_or_none()
+        user_id=user.id, group_id=group_id).one_or_none()
 
     if membership == None:
-        return jsonify({"message": "Request not found"}), 404
+        return jsonify({"message": "membership not found"}), 404
 
     user_membership = next(
         (m for m in membership.group.members if m.id == user.id), None)
@@ -751,16 +771,17 @@ def create_new_shift_swap(membership_id, shift_id):
     return jsonify({"message": "Shift swap request created successfully"}), 201
 
 
-@app.route('/user/groups/memberships/<membership_id>/shift/<shift_id>/shift-swap/<swap_id>/link', methods=["POST"])
+@app.route('/user/groups/<group_id>/shift/<shift_id>/shift-swap/<swap_id>/link', methods=["POST"])
 @login_required
-def link_shift_swap(membership_id, shift_id, swap_id):
+def link_shift_swap(group_id, shift_id, swap_id):
     user = g.user
 
+    # Query the GroupMembership table
     membership = GroupMembership.query.filter_by(
-        id=membership_id).one_or_none()
+        user_id=user.id, group_id=group_id).one_or_none()
 
     if membership == None:
-        return jsonify({"message": "Request not found"}), 404
+        return jsonify({"message": "membership not found"}), 404
 
     user_membership = next(
         (m for m in membership.group.members if m.id == user.id), None)
@@ -832,16 +853,17 @@ def link_shift_swap(membership_id, shift_id, swap_id):
     return jsonify({"message": "Shift swap request linked successfully awaiting admin approval"}), 200
 
 
-@app.route('/user/groups/memberships/<membership_id>/shift/<shift_id>/shift-swap/<swap_id>/approve', methods=["POST"])
+@app.route('/user/groups/<group_id>/shift/<shift_id>/shift-swap/<swap_id>/approve', methods=["POST"])
 @login_required
-def approve_shift_swap(membership_id, shift_id, swap_id):
+def approve_shift_swap(group_id, shift_id, swap_id):
     user = g.user
 
+    # Query the GroupMembership table
     membership = GroupMembership.query.filter_by(
-        id=membership_id).one_or_none()
+        user_id=user.id, group_id=group_id).one_or_none()
 
     if membership == None:
-        return jsonify({"message": "Request not found"}), 404
+        return jsonify({"message": "membership not found"}), 404
 
     user_membership = next(
         (m for m in membership.group.members if m.id == user.id), None)
@@ -907,16 +929,17 @@ def approve_shift_swap(membership_id, shift_id, swap_id):
     return jsonify({"message": "Shift swap was successfully approved"}), 200
 
 
-@app.route('/user/groups/memberships/<membership_id>/shift/<shift_id>/shift-swap/<swap_id>/decline', methods=["DELETE"])
+@app.route('/user/groups/<group_id>/shift/<shift_id>/shift-swap/<swap_id>/decline', methods=["DELETE"])
 @login_required
-def decline_shift_swap(membership_id, shift_id, swap_id):
+def decline_shift_swap(group_id, shift_id, swap_id):
     user = g.user
 
+    # Query the GroupMembership table
     membership = GroupMembership.query.filter_by(
-        id=membership_id).one_or_none()
+        user_id=user.id, group_id=group_id).one_or_none()
 
     if membership == None:
-        return jsonify({"message": "Request not found"}), 404
+        return jsonify({"message": "membership not found"}), 404
 
     user_membership = next(
         (m for m in membership.group.members if m.id == user.id), None)

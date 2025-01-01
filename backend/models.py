@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import uuid
 import os
 from flask import Flask
@@ -44,7 +44,9 @@ class User(db.Model):
 
     @property
     def assigned_shifts(self):
-        current_time = datetime.now(timezone.utc)
+        # No timezone -> naive current time
+        current_time = datetime.now()
+        # Return only shifts where end_time >= now
         return self.shifts.filter(Shift.end_time >= current_time)
 
     @property
@@ -54,8 +56,6 @@ class User(db.Model):
     @property
     def available_groups(self):
         return self.groups.filter(Group.owner_id != self.id)
-
-    # Methods
 
     def get_details(self):
         return {
@@ -74,21 +74,20 @@ class Notification_messages(db.Model):
     )
     read = db.Column(db.Boolean, nullable=False, default=False)
     message = db.Column(db.Text, nullable=False, default='')
+    # Remove timezone=True, and remove usage of timezone.utc
     iat = db.Column(
-        db.DateTime(timezone=True),
+        db.DateTime(),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now()
     )
 
-    # Relationship
     user = db.relationship(
         'User',
         back_populates='notifications',
         passive_deletes=True
     )
 
-    # Methods
-    def getdetails(self):
+    def get_details(self):
         return {
             "id": self.id,
             "user_id": self.user_id,
@@ -130,10 +129,9 @@ class Group(db.Model):
 
     @property
     def recent_shifts(self):
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=1)
+        # No timezone -> naive
+        cutoff_time = datetime.now() - timedelta(days=1)
         return self.shifts.filter(Shift.end_time >= cutoff_time)
-
-    # Methods
 
     def get_details(self):
         return {
@@ -158,7 +156,6 @@ class GroupMembership(db.Model):
     admin = db.Column(db.Boolean, nullable=False, default=False)
     approved = db.Column(db.Boolean, nullable=False, default=False)
 
-    # Relationships
     user = db.relationship('User', passive_deletes=True)
     group = db.relationship('Group', passive_deletes=True)
 
@@ -176,10 +173,10 @@ class Shift(db.Model):
         db.ForeignKey('users.id', ondelete='CASCADE'),
         nullable=True
     )
-    start_time = db.Column(db.DateTime(timezone=True), nullable=False)
-    end_time = db.Column(db.DateTime(timezone=True), nullable=False)
+    # Remove timezone=True
+    start_time = db.Column(db.DateTime(), nullable=False)
+    end_time = db.Column(db.DateTime(), nullable=False)
 
-    # Relationships
     group = db.relationship(
         'Group',
         back_populates='shifts',
@@ -197,7 +194,6 @@ class Shift(db.Model):
         passive_deletes=True
     )
 
-    # Methods
     def get_details(self):
         return {
             "id": self.id,
@@ -232,7 +228,6 @@ class Shift_swap(db.Model):
         nullable=True
     )
 
-    # Relationships
     shift = db.relationship(
         'Shift',
         back_populates='swaps',
@@ -255,7 +250,6 @@ class Shift_swap(db.Model):
     )
 
 
-# DO NOT MODIFY THIS FUNCTION
 def connect_db(app):
     """Connect to database."""
     db.app = app
@@ -263,14 +257,12 @@ def connect_db(app):
 
 
 if __name__ == '__main__':
-    # Set up the Flask application
     app = Flask(__name__)
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
         "SQLALCHEMY_DATABASE_URI")
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     connect_db(app)
 
-    # Use the application context to drop and create tables
     with app.app_context():
         db.drop_all()
         db.create_all()

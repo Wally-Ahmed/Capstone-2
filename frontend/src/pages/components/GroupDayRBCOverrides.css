@@ -44,8 +44,14 @@
     color: #000 !important;
     background-color: #30bce7 !important;
     border-radius: 4px;
-    padding: 2px;
-    margin: -1px;
+    margin: 5px !important;
+    /* padding: 2px; */
+    /* margin: -1px; */
+}
+
+.group-day-rbc .rbc-time-header-gutter,
+.group-day-rbc .rbc-row {
+    background-color: rgb(97, 97, 97) !important;
 }
 
 /* ...and so on, for every RBC override you already have. */
@@ -53,9 +59,9 @@
 /* Example of resource column styling (scoped) */
 .group-day-rbc .rbc-time-content>.rbc-day-slot {
     flex: 0 0 auto !important;
-    width: 350px !important;
-    min-width: 350px !important;
-    max-width: 350px !important;
+    width: 250px !important;
+    min-width: 250px !important;
+    max-width: 250px !important;
     border: 1px solid #ddd;
 }
 

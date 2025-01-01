@@ -1,18 +1,24 @@
 // components/GroupSchedule.jsx
-
 import React, { useState, useEffect } from 'react';
 import { SideMenu } from './SideMenu';
 import { GroupSidebar } from './GroupSidebar';
 import { CalendarComponent } from './CalendarComponent';
 import { backendURL } from '@/config';
 
-export function GroupSchedule({ selectedGroup, handleSelectGroup }) {
+export function GroupSchedule({ selectedGroup, handleSelectGroup, user }) {
     const [viewMode, setViewMode] = useState({
-        personView: 'I',    // 'I' (Individual) or 'G' (Group)
-        calanderView: 'W',  // 'D' (Day), 'W' (Week), 'M' (Month)
+        personView: 'I', // 'I' (Individual) or 'G' (Group)
+        calanderView: 'W', // 'D' (Day), 'W' (Week), 'M' (Month)
     });
     const [showMenu, setShowMenu] = useState(true);
     const [groupData, setGroupData] = useState(null);
+
+    // Initialize the selected employee to the user
+    const [selectedEmployee, setSelectedEmployee] = useState(user);
+
+    useEffect(() => {
+        setSelectedEmployee(user);
+    }, [user]);
 
     // Fetch group info from the backend
     const getGroupData = async () => {
@@ -20,12 +26,10 @@ export function GroupSchedule({ selectedGroup, handleSelectGroup }) {
             method: 'GET',
             credentials: 'include',
         });
-
         if (!res.ok) {
             window.location.reload();
             return;
         }
-
         const data = await res.json();
         setGroupData(data);
     };
@@ -37,9 +41,14 @@ export function GroupSchedule({ selectedGroup, handleSelectGroup }) {
     }, []);
 
     if (!groupData) {
-        // Could display a loading spinner or fallback UI
         return <div>Loading...</div>;
     }
+
+    // If personView === 'I', filter out shifts that don't belong to selectedEmployee
+    const effectiveShifts =
+        viewMode.personView === 'I'
+            ? groupData.shifts.filter((shift) => shift.user_id === selectedEmployee?.id)
+            : groupData.shifts;
 
     return (
         <div className="flex h-full w-full">
@@ -53,13 +62,15 @@ export function GroupSchedule({ selectedGroup, handleSelectGroup }) {
                 />
             </div>
 
-            {/* Optional group sidebar (shows members, requests, etc.) */}
+            {/* Optional group sidebar */}
             {showMenu && (
                 <div className="w-[15%] bg-gray-900">
                     <GroupSidebar
                         selectedGroup={selectedGroup}
                         onReturn={() => handleSelectGroup(null)}
                         employees={groupData.members}
+                        selectedEmployee={selectedEmployee}
+                        onSelectEmployee={(emp) => setSelectedEmployee(emp)}
                         role={groupData.role}
                         membershipRequests={groupData.membership_requests}
                     />
@@ -69,13 +80,12 @@ export function GroupSchedule({ selectedGroup, handleSelectGroup }) {
             {/* Main content: a single CalendarComponent */}
             <div className="w-[80%] flex-1 bg-gray-700 flex">
                 <CalendarComponent
-                    // We pass down the "viewMode" object so the child can see:
-                    //   viewMode.calanderView => 'D' | 'W' | 'M'
-                    //   viewMode.personView   => 'I' | 'G'
                     viewMode={viewMode}
                     setViewMode={setViewMode}
-                    shifts={groupData.shifts}
+                    shifts={effectiveShifts}
                     members={groupData.members}
+                    userRole={groupData.role}
+                    groupId={groupData.id}
                 />
             </div>
         </div>

@@ -10,8 +10,9 @@ import './CalendarOverrides.css';  // <-- Import your overrides globally
 import { add, sub, isSameDay, startOfWeek, endOfWeek, format } from 'date-fns';
 import { DayEventsPreview } from './DayEventsPreview';
 import GroupDayRBC from './GroupDayRBC';
+import { NewShiftForm } from './NewShiftForm';
+import EditShiftForm from './EditShiftForm';
 
-// Convert moment to RBC localizer
 const localizer = momentLocalizer(moment);
 
 export function CalendarComponent({
@@ -19,14 +20,16 @@ export function CalendarComponent({
     setViewMode,
     shifts = [],
     members = [],
+    userRole = '',
+    groupId = ''
 }) {
-    // We'll keep track of the calendar's current date here
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [showDayPreview, setShowDayPreview] = useState(null);
+    const [showNewShiftForm, setShowNewShiftForm] = useState(false);
 
-    // Example "show day preview" modal
-    const [showDayPreview, setShowDayPreview] = useState(false);
+    // The currently selected shift (for editing, etc.)
+    const [selectedShift, setSelectedShift] = useState(null);
 
-    // Map your custom calanderView to RBC's Views
     const rbcViewMap = {
         D: Views.DAY,
         W: Views.WEEK,
@@ -34,75 +37,52 @@ export function CalendarComponent({
     };
     const rbcView = rbcViewMap[viewMode.calanderView] || Views.WEEK;
 
-
+    // When an event is clicked, find that shift object & store in selectedShift
     const onSelectEvent = (event) => {
-        alert(`Selected event: ${event.title}`)
-    }
+        const clickedShift = shifts.find((s) => s.id === event.id);
+        setSelectedShift(clickedShift || null);
+    };
 
     const onSelectSlot = (slotInfo) => {
-        if (viewMode.calanderView !== 'M') { return }
-        alert(
-            `Selected date cell: ` +
-            `${slotInfo.start.toDateString()} - ` +
-            `${slotInfo.end.toDateString()}`
-        );
-        setShowDayPreview(true);
-    }
+        if (viewMode.calanderView !== 'M') return;
+        if (slotInfo.slots && slotInfo.slots.length === 1) {
+            alert(`Clicked single day: ${slotInfo.start.toDateString()}`);
+            setViewMode({ ...viewMode, calanderView: 'D' });
+            setCurrentDate(slotInfo.start);
+        } else {
+            alert(
+                `Selected date cell(s): From ${slotInfo.start.toDateString()} ` +
+                `to ${slotInfo.end.toDateString()}`
+            );
+            setShowDayPreview({ startTime: slotInfo.start, endTime: slotInfo.end });
+        }
+    };
 
     const onShowMore = (events, date) => {
         alert(`Clicked "+${events.length} more" on date: ${date.toDateString()}`);
-        // Switch to Day view for that date
         setViewMode({ ...viewMode, calanderView: 'D' });
         setCurrentDate(date);
-    }
+    };
 
+    // Build RBC event objects from shifts
+    const myEvents = shifts.map((shift) => {
+        const shiftOwner = members.find((m) => m.id === shift.user_id);
+        const ownerName = shiftOwner ? shiftOwner.username : 'Shift';
+        return {
+            id: shift.id,
+            title: ownerName,
+            start: new Date(shift.start_time),
+            end: new Date(shift.end_time),
+            resourceId: shift.user_id,
+        };
+    });
 
-    // Hardcoded events for development (these are your example events)
-    const myEvents = [
-        {
-            id: 1,
-            title: 'Morning Standup',
-            start: new Date(2024, 11, 20, 9, 0),
-            end: new Date(2024, 11, 20, 9, 30),
-            allDay: false,
-            resourceId: 'john',
-        },
-        {
-            id: 2,
-            title: 'Project Meeting',
-            start: new Date(2024, 11, 20, 10, 0),
-            end: new Date(2024, 11, 20, 11, 0),
-            allDay: false,
-            resourceId: 'john',
-        },
-        {
-            id: 3,
-            title: 'Lunch Break',
-            start: new Date(2024, 11, 20, 12, 0),
-            end: new Date(2024, 11, 20, 13, 0),
-            allDay: false,
-            resourceId: 'john',
-        },
-        {
-            id: 4,
-            title: 'Client Presentation',
-            start: new Date(2024, 11, 20, 15, 0),
-            end: new Date(2024, 11, 20, 16, 30),
-            allDay: false,
-            resourceId: 'john',
-        },
-    ];
+    // Build RBC resources from members
+    const resources = members.map((emp) => ({
+        resourceId: emp.id,
+        resourceTitle: emp.username,
+    }));
 
-    const resources = [
-        { resourceId: 'john', resourceTitle: 'John' },
-        { resourceId: 'jane', resourceTitle: 'Jane' },
-        { resourceId: 'alex', resourceTitle: 'Alex' },
-    ]
-
-    // For demonstration, we combine your "myEvents" with the "shifts" from props
-    // OR you can just keep them separate.
-
-    // Handlers for Next/Prev navigation, adding or subtracting days/weeks/months
     const handleNext = () => {
         if (viewMode.calanderView === 'D') {
             setCurrentDate(add(currentDate, { days: 1 }));
@@ -123,18 +103,16 @@ export function CalendarComponent({
         }
     };
 
-    // Example: highlight days that have "myEvents" in Month view if personView === 'I'
     const dayPropGetter = (date) => {
         const isBlocked = myEvents.some((event) => isSameDay(event.start, date));
         if (viewMode.personView !== 'I' || viewMode.calanderView !== 'M') {
             return {};
         }
         return isBlocked
-            ? { className: 'xedOffDay cursor-pointer' }
+            ? { className: ' xedOffDay cursor-pointer z-10' }
             : { className: 'cursor-pointer' };
     };
 
-    // Show a dynamic header for Month/Week/Day
     const getCalendarHeader = () => {
         if (viewMode.calanderView === 'M') {
             return `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`;
@@ -151,87 +129,108 @@ export function CalendarComponent({
     return (
         <div className="flex flex-col w-full h-full">
             {/* Custom toolbar (Prev, Header, Next) */}
-            <div className="flex items-center justify-center p-2 bg-gray-700 text-white space-x-4">
-                <button onClick={handlePrev} className="px-2 py-1 bg-gray-500 rounded">
-                    Prev
-                </button>
+            <div className="relative">
+                <div className="flex items-center justify-center p-2 bg-gray-700 text-white space-x-4">
+                    <button onClick={handlePrev} className="px-2 py-1 bg-gray-500 rounded">
+                        Prev
+                    </button>
 
-                <span>{getCalendarHeader()}</span>
+                    <span>{getCalendarHeader()}</span>
 
-                <button onClick={handleNext} className="px-2 py-1 bg-gray-500 rounded">
-                    Next
-                </button>
+                    <button onClick={handleNext} className="px-2 py-1 bg-gray-500 rounded">
+                        Next
+                    </button>
+                </div>
+
+                {(userRole === 'owner' || userRole === 'admin') && (
+                    <button
+                        onClick={() => setShowNewShiftForm(true)}
+                        className="absolute right-10 top-2 w-8 h-8 flex items-center justify-center bg-gray-500 text-white rounded"
+                    >
+                        <svg
+                            className="w-6 h-6"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="white"
+                            strokeWidth={2}
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+                        </svg>
+                    </button>
+                )}
             </div>
 
             {/* The Big Calendar itself */}
             <div className="flex flex-col w-full h-full overflow-y-auto scrollbar scrollbar-thumb-rounded-full scrollbar-track-rounded-full scrollbar-thumb-gray-700 scrollbar-track-gray-800 pt-5 pb-[1px]">
                 <div className="flex-1 flex">
-
-                    {(viewMode.calanderView === 'D' && viewMode.personView === 'G') && <>
+                    {(viewMode.calanderView === 'D' && viewMode.personView === 'G') ? (
                         <GroupDayRBC
                             localizer={localizer}
                             view={rbcView}
                             date={currentDate}
-                            // We do our own next/prev, so onNavigate can be empty or no-op
                             onNavigate={() => { }}
                             toolbar={false}
                             style={{ flex: 1 }}
                             events={!(viewMode.calanderView === 'M' && viewMode.personView === 'I') ? myEvents : []}
                             startAccessor="start"
                             endAccessor="end"
-                            resourceId="resourceId"
-                            resourceTitle="resourceTitle"
                             selectable={viewMode.calanderView === 'M'}
                             resources={resources}
-
-                            // Hardcoded dev alerts
                             onSelectEvent={onSelectEvent}
                             onSelectSlot={onSelectSlot}
                             onShowMore={onShowMore}
-
                             dayPropGetter={dayPropGetter}
                         />
-                    </>}
-
-                    {!(viewMode.calanderView === 'D' && viewMode.personView === 'G') && <>
+                    ) : (
                         <Calendar
                             localizer={localizer}
                             view={rbcView}
                             date={currentDate}
-                            // We do our own next/prev, so onNavigate can be empty or no-op
                             onNavigate={() => { }}
                             toolbar={false}
                             style={{ flex: 1 }}
                             events={!(viewMode.calanderView === 'M' && viewMode.personView === 'I') ? myEvents : []}
                             startAccessor="start"
                             endAccessor="end"
-                            resourceId="resourceId"
-                            resourceTitle="resourceTitle"
                             selectable={viewMode.calanderView === 'M'}
                             // resources={resources}
-
-                            // Hardcoded dev alerts
                             onSelectEvent={onSelectEvent}
                             onSelectSlot={onSelectSlot}
                             onShowMore={onShowMore}
-
                             dayPropGetter={dayPropGetter}
                         />
-                    </>}
-
+                    )}
                 </div>
             </div>
 
+            {showDayPreview && (
+                <DayEventsPreview
+                    closeDayEventsPreview={() => setShowDayPreview(false)}
+                    startTime={showDayPreview.startTime}
+                    endTime={showDayPreview.endTime}
+                    events={myEvents}
+                    shifts={shifts}
+                    setSelectedShift={setSelectedShift}
+                />
+            )}
 
-            {/* If you have a "DayEventsPreview" modal */}
-            {
-                showDayPreview && (
-                    <DayEventsPreview
-                        closeDayEventsPreview={() => setShowDayPreview(false)}
-                    />
-                )
-            }
-        </div >
+            {showNewShiftForm && (
+                <NewShiftForm
+                    closeNewShiftForm={() => setShowNewShiftForm(false)}
+                    employees={members}
+                    groupId={groupId}
+                />
+            )}
+
+            {selectedShift && (
+                <EditShiftForm
+                    selectedShift={selectedShift}
+                    employees={members}
+                    closeEditShiftForm={() => setSelectedShift(null)}
+                    groupId={groupId}
+                />
+            )}
+        </div>
     );
 }
 
