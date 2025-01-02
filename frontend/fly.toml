@@ -1,7 +1,6 @@
 app = "my-vite-spa"
 
 [build]
-image = "Dockerfile"  # Tells Fly to use your Dockerfile
 
 [[services]]
 internal_port = 8080
