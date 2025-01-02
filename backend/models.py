@@ -51,7 +51,8 @@ class User(db.Model):
 
     @property
     def unread_notifications(self):
-        return self.notifications.filter(not Notification_messages.read)
+        # Return only notifications where read == False (i.e., unread)
+        return self.notifications.filter_by(read=False)
 
     @property
     def available_groups(self):
@@ -107,7 +108,7 @@ class Group(db.Model):
         nullable=False
     )
 
-    # Relationships
+    # Existing relationships
     owner = db.relationship('User', back_populates='my_groups')
     members = db.relationship(
         'User',
@@ -125,7 +126,15 @@ class Group(db.Model):
 
     @property
     def membership_requests(self):
-        return self.members.filter(GroupMembership.approved == False)
+        """
+        Return a list of GroupMembership rows where:
+          - group_id == self.id
+          - approved == False
+        """
+        return GroupMembership.query.filter_by(
+            group_id=self.id,
+            approved=False
+        ).all()
 
     @property
     def recent_shifts(self):
@@ -143,6 +152,16 @@ class Group(db.Model):
 
 class GroupMembership(db.Model):
     __tablename__ = 'group_memberships'
+
+    # This is your new "extra" ID column, not a primary key
+    id = db.Column(
+        db.UUID(as_uuid=True),
+        default=uuid.uuid4,
+        unique=True,        # ensures each row has a distinct UUID
+        nullable=False
+    )
+
+    # The composite primary key remains:
     user_id = db.Column(
         db.UUID(as_uuid=True),
         db.ForeignKey('users.id', ondelete='CASCADE'),
@@ -153,11 +172,21 @@ class GroupMembership(db.Model):
         db.ForeignKey('groups.id', ondelete='CASCADE'),
         primary_key=True
     )
+
     admin = db.Column(db.Boolean, nullable=False, default=False)
     approved = db.Column(db.Boolean, nullable=False, default=False)
 
     user = db.relationship('User', passive_deletes=True)
     group = db.relationship('Group', passive_deletes=True)
+
+    def get_details(self):
+        return {
+            # Now `id` is safe to use:
+            "id": str(self.id),
+            "group_id": str(self.group_id),
+            "user_id": str(self.user_id),
+            "username": self.user.username,  # if user is not None
+        }
 
 
 class Shift(db.Model):

@@ -38,6 +38,7 @@ export function SignIn() {
     try {
       const res = await fetch(`${backendURL}/login`, {
         method: 'POST', // Changed to POST to send form data securely
+        credentials: 'include',
         headers: {
           'Cache-Control': 'no-store',
           'Content-Type': 'application/json',
@@ -52,6 +53,7 @@ export function SignIn() {
       } else {
         // On successful login, redirect to '/app'
         navigate('/app');
+        window.location.reload();
       }
     } catch (error) {
       // Handle network or other errors
@@ -173,13 +175,13 @@ export function SignIn() {
             Sign In
           </Button>
 
-          <div className="flex items-center justify-between gap-2 mt-6">
+          {/* <div className="flex items-center justify-between gap-2 mt-6">
             <Typography variant="small" className="font-medium text-gray-900">
               <a href="#">Forgot Password</a>
             </Typography>
-          </div>
+          </div> */}
           <div className="space-y-4 mt-8 flex flex-col">
-            <Link to={`${backendURL}/login-google`}>
+            <Link to={`${backendURL}/auth-google`}>
               <Button
                 size="lg"
                 color="white"
@@ -200,10 +202,10 @@ export function SignIn() {
                   </defs>
                 </svg>
 
-                <span>Sign in With Google</span>
+                <span>Continue With Google</span>
               </Button>
             </Link>
-            <Link to={`${backendURL}/login-microsoft`}>
+            <Link to={`${backendURL}/auth-microsoft`}>
               <Button
                 size="lg"
                 color="white"
@@ -220,7 +222,7 @@ export function SignIn() {
                   </g>
                 </svg>
 
-                <span>Sign in With Microsoft</span>
+                <span>Continue With Microsoft</span>
               </Button>
             </Link>
           </div>

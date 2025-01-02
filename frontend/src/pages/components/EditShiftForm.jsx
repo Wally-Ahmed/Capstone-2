@@ -8,6 +8,9 @@ export const EditShiftForm = ({
     closeEditShiftForm,
     groupId,
     selectedShift,
+    getGroupData,
+    isAdmin,
+    membershipRequests = [],
     employees = [],
 }) => {
     // We'll keep separate states:
@@ -100,6 +103,7 @@ export const EditShiftForm = ({
                 alert('Failed to update shift');
                 return;
             }
+            getGroupData()
             closeEditShiftForm();
         } catch (error) {
             console.error('Error updating shift:', error);
@@ -121,12 +125,16 @@ export const EditShiftForm = ({
                 alert('Failed to delete shift');
                 return;
             }
+            getGroupData()
             closeEditShiftForm();
         } catch (error) {
             console.error('Error deleting shift:', error);
             alert('An error occurred while deleting the shift');
         }
     };
+
+    const myEmployees = employees.filter(member =>
+        !membershipRequests.some(request => request.user_id === member.id))
 
     return ReactDOM.createPortal(
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -207,12 +215,12 @@ export const EditShiftForm = ({
 
                     {isDropdownOpen && (
                         <div className="absolute top-[105%] left-0 w-full bg-gray-700 border border-gray-600 rounded mt-1 z-10">
-                            {employees.length === 0 && (
+                            {myEmployees.length === 0 && (
                                 <div className="p-2 text-sm text-gray-300">
                                     No employees found
                                 </div>
                             )}
-                            {employees.map((emp) => (
+                            {myEmployees.map((emp) => (
                                 <div
                                     key={emp.id}
                                     onClick={() => {
@@ -234,22 +242,24 @@ export const EditShiftForm = ({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="absolute right-9 bottom-5 flex space-x-4">
-                    <button
-                        onClick={handleSaveShift}
-                        disabled={!selectedEmployee || !rawStartDate || !rawEndDate}
-                        className="bg-blue-600 px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Save
-                    </button>
+                {isAdmin &&
+                    <div className="absolute right-9 bottom-5 flex space-x-4">
+                        <button
+                            onClick={handleSaveShift}
+                            disabled={!selectedEmployee || !rawStartDate || !rawEndDate}
+                            className="bg-blue-600 px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Save
+                        </button>
 
-                    <button
-                        onClick={handleDeleteShift}
-                        className="bg-red-600 px-4 py-2 rounded"
-                    >
-                        Delete
-                    </button>
-                </div>
+                        <button
+                            onClick={handleDeleteShift}
+                            className="bg-red-600 px-4 py-2 rounded"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                }
             </div>
         </div>,
         document.body

@@ -22,12 +22,6 @@ export const ProfileTab = ({ showProfileTab, closeProfileTab, user, notification
                 closeProfileTab();
             }
         };
-        if (showProfileTab) {
-            readNotifications();
-            const intervalId = setInterval(readNotifications, 10000);
-            return () => clearInterval(intervalId); // Cleanup on unmount
-        }
-
     }, []);
 
     return ReactDOM.createPortal(
@@ -65,12 +59,12 @@ export const ProfileTab = ({ showProfileTab, closeProfileTab, user, notification
 
                 {/* Scrollable Content Area */}
                 <h2 className="text-2xl font-bold p-2">Notifications:</h2>
-                <div className="space-y-4 h-full overflow-y-auto pb-10">
+                <div className="w-full h-3/4 overflow-y-auto scrollbar scrollbar-thumb-rounded-full scrollbar-track-rounded-full scrollbar-thumb-gray-700 scrollbar-track-gray-800 pt-5">
                     {notifications && notifications.length > 0 ? (
                         notifications.map((notification) => (
                             <div
                                 key={notification.id}
-                                className={`p-4 rounded-lg ${notification.read ? 'bg-gray-700' : 'bg-gray-600'
+                                className={`p-4 mb-2 rounded-lg ${notification.read ? 'bg-gray-700' : 'bg-gray-600'
                                     }`}
                             >
                                 <p>{notification.message}</p>

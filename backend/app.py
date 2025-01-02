@@ -1,6 +1,7 @@
 # app.py
 
 from flask import Flask, redirect, url_for, jsonify, request, g, session
+from sqlalchemy import case, asc
 from flask_debugtoolbar import DebugToolbarExtension
 from authlib.integrations.flask_client import OAuth
 from models import db, connect_db, User, Group, GroupMembership, Shift, Shift_swap, Notification_messages
@@ -86,32 +87,40 @@ def login_host():
         return jsonify({"message": "Required parameters are missing"}), 400
 
     user = User.query.filter_by(
-        google_openid=None, microsoft_openid=None, email=email).one_or_none()
+        google_openid=None, microsoft_openid=None, email=email
+    ).one_or_none()
 
     if user == None:
         return jsonify({
             "message": "A user for this account does not exist"
         }), 401
 
-    authorized = bcrypt.check_password_hash(user.password, password)
+    authorized = bcrypt.check_password_hash(user.password_hash, password)
     if not authorized:
         return jsonify({
             "message": "Email and password combination not valid"
         }), 401
 
-    # Create the JWT payload
+    # Create the JWT payload (FIX: remove 'datetime.' prefix)
     payload = {
-        "user_id": user.id,
-        # Token expires in 3 hour
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+        "user_id": str(user.id),
+        # Token expires in 3 hours from now
+        "exp": datetime.utcnow() + timedelta(hours=3)
     }
 
     # Encode the JWT
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
     # Store token into session
-    session['access_token'] = token
+    session['access_token'] = str(token)
     session['auth_type'] = 'Host'
+    session.permanent = True
+
+    access_token = session.get('access_token')
+    auth_type = session.get('auth_type')
+
+    if access_token is None or auth_type is None:
+        return jsonify({"message": "Token data is missing", "status": 401}), 401
 
     return jsonify({"message": "login successful"})
 
@@ -124,16 +133,15 @@ def signup_host():
     password = body.get("password")
     confirm_password = body.get("confirm_password")
 
-    if username == None or email == None or password == None or confirm_password == None:
+    if not all([username, email, password, confirm_password]):
         return jsonify({"message": "Required parameters are missing"}), 400
 
-    user = User.query.filter_by(
-        google_openid=None, microsoft_openid=None, email=email).one_or_none()
+    existing_user = User.query.filter_by(
+        google_openid=None, microsoft_openid=None, email=email
+    ).one_or_none()
 
-    if user != None:
-        return jsonify({
-            "message": "A user for this email already exists"
-        }), 401
+    if existing_user is not None:
+        return jsonify({"message": "A user for this email already exists"}), 401
 
     if password != confirm_password:
         return jsonify({"message": "password does not match password confirmation"}), 400
@@ -148,66 +156,28 @@ def signup_host():
     db.session.add(new_user)
     db.session.commit()
 
-    # Create the JWT payload
     payload = {
-        "user_id": str(new_user.id),
-        # Token expires in 3 hour
+        "user_id": str(new_user.id),   # Convert UUID to str
         "exp": datetime.utcnow() + timedelta(hours=3)
     }
 
-    # Encode the JWT
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
-    # Store token into session
-    session['access_token'] = token
+    session['access_token'] = str(token)
     session['auth_type'] = 'Host'
-
-    # Make the session permanent so it persists after the browser is closed
-    session.permanent = True
+    session.permanent = True  # Token persists beyond browser close
 
     return jsonify({"message": "registration successful"})
 
 
-@app.route('/login-google', methods=["GET"])
-def login_google():
-    redirect_uri = url_for('login_google_callback', _external=True)
+@app.route('/auth-google', methods=["GET"])
+def auth_google():
+    redirect_uri = url_for('auth_google_callback', _external=True)
     return google.authorize_redirect(redirect_uri)
 
 
-@app.route('/signup-google', methods=["GET"])
-def signup_google():
-    redirect_uri = url_for('signup_google_callback', _external=True)
-    return google.authorize_redirect(redirect_uri)
-
-
-@app.route('/login-google/callback', methods=["GET"])
-def login_google_callback():
-    # Access token from Google (needed to get user info)
-    token = google.authorize_access_token()
-
-    # Retrieve user information
-    user_info = google.userinfo()
-
-    user = User.query.filter_by(
-        google_openid=user_info.get("sub")).one_or_none()
-
-    if user == None:
-        return jsonify({
-            "message": "A user for this account does not exist"
-        }), 401
-
-    # Store token into session
-    session['access_token'] = token.get('access_token')
-    session['auth_type'] = 'Google'
-
-    # Make the session permanent so it persists after the browser is closed
-    session.permanent = True
-
-    return redirect(redirect_url)
-
-
-@app.route('/signup-google/callback', methods=["GET"])
-def signup_google_callback():
+@app.route('/auth-google/callback', methods=["GET"])
+def auth_google_callback():
     # Access token from Google (needed to get user info)
     token = google.authorize_access_token()
 
@@ -236,48 +206,14 @@ def signup_google_callback():
     return redirect(redirect_url)
 
 
-# Microsoft OAuth Routes
-@app.route('/login-microsoft', methods=["GET"])
-def login_microsoft():
-    redirect_uri = url_for('login_microsoft_callback', _external=True)
+@app.route('/auth-microsoft', methods=["GET"])
+def auth_microsoft():
+    redirect_uri = url_for('auth_microsoft_callback', _external=True)
     return microsoft.authorize_redirect(redirect_uri)
 
 
-@app.route('/signup-microsoft', methods=["GET"])
-def signup_microsoft():
-    redirect_uri = url_for('signup_microsoft_callback', _external=True)
-    return microsoft.authorize_redirect(redirect_uri)
-
-
-@app.route('/login-microsoft/callback', methods=["GET"])
-def login_microsoft_callback():
-    # Access token from Microsoft (needed to get user info)
-    token = microsoft.authorize_access_token()
-
-    # Retrieve user information
-    resp = microsoft.get('me')
-    user_info = resp.json()
-
-    user = User.query.filter_by(
-        microsoft_openid=user_info.get("id")).one_or_none()
-
-    if user == None:
-        return jsonify({
-            "message": "A user for this account does not exist"
-        }), 401
-
-    # Store token into session
-    session['access_token'] = token.get('access_token')
-    session['auth_type'] = 'Microsoft'
-
-    # Make the session permanent so it persists after the browser is closed
-    session.permanent = True
-
-    return redirect(redirect_url)
-
-
-@app.route('/signup-microsoft/callback', methods=["GET"])
-def signup_microsoft_callback():
+@app.route('/auth-microsoft/callback', methods=["GET"])
+def auth_microsoft_callback():
     # Access token from Microsoft (needed to get user info)
     token = microsoft.authorize_access_token()
 
@@ -362,6 +298,55 @@ def read_all_notifications():
     db.session.commit()
 
     return jsonify({"message": "All notifications marked as read."}), 200
+
+
+@app.route('/groups/search', methods=["GET"])
+@login_required
+def search_groups():
+    name = request.args.get("name", "").strip()
+    if not name:
+        return jsonify({"message": "Required parameter 'name' is missing"}), 400
+
+    # 1. Build a CASE expression: 0 if name starts with 'name', else 1
+    starts_with_case = case(
+        (Group.name.ilike(f"{name}%"), 0),
+        else_=1
+    )
+
+    # 2. Query groups that contain `name` (ilike = case-insensitive LIKE)
+    #    Order by `starts_with_case` (start-with first), then Group.name asc
+    matching_groups = (
+        Group.query
+        .filter(Group.name.ilike(f"%{name}%"))
+        .order_by(starts_with_case, asc(Group.name))
+        .all()
+    )
+
+    user_id = g.user.id
+
+    # 3. Build the response list
+    results = []
+    for group in matching_groups:
+        membership = GroupMembership.query.filter_by(
+            user_id=user_id,
+            group_id=group.id
+        ).one_or_none()
+
+        # Determine membership status
+        if membership is None:
+            status = None
+        elif membership.approved:
+            status = "approved"
+        else:
+            status = "pending"
+
+        results.append({
+            "id": str(group.id),
+            "name": group.name,
+            "membership_status": status,
+        })
+
+    return jsonify({"groups": results}), 200
 
 
 @app.route('/user/groups', methods=["GET", "POST"])

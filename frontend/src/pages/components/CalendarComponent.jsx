@@ -4,30 +4,45 @@ import React, { useState } from 'react';
 import { Calendar, momentLocalizer, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import './CalendarOverrides.css';  // <-- Import your overrides globally
+import './CalendarOverrides.css';
 
 // date-fns helpers
-import { add, sub, isSameDay, startOfWeek, endOfWeek, format } from 'date-fns';
+import {
+    add,
+    sub,
+    isSameDay,
+    startOfWeek,
+    endOfWeek,
+    format,
+    subDays,
+} from 'date-fns';
+
 import { DayEventsPreview } from './DayEventsPreview';
 import GroupDayRBC from './GroupDayRBC';
 import { NewShiftForm } from './NewShiftForm';
 import EditShiftForm from './EditShiftForm';
 
+// Material Tailwind UI
+import { IconButton } from '@material-tailwind/react';
+
+// Heroicons (24/outline version)
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+
 const localizer = momentLocalizer(moment);
 
 export function CalendarComponent({
-    viewMode,      // e.g. { calanderView: 'W', personView: 'I' }
+    viewMode, // e.g. { calanderView: 'W', personView: 'I' }
     setViewMode,
     shifts = [],
     members = [],
+    membershipRequests = [],
     userRole = '',
-    groupId = ''
+    groupId = '',
+    getGroupData = () => { },
 }) {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [showDayPreview, setShowDayPreview] = useState(null);
     const [showNewShiftForm, setShowNewShiftForm] = useState(false);
-
-    // The currently selected shift (for editing, etc.)
     const [selectedShift, setSelectedShift] = useState(null);
 
     const rbcViewMap = {
@@ -37,38 +52,12 @@ export function CalendarComponent({
     };
     const rbcView = rbcViewMap[viewMode.calanderView] || Views.WEEK;
 
-    // When an event is clicked, find that shift object & store in selectedShift
-    const onSelectEvent = (event) => {
-        const clickedShift = shifts.find((s) => s.id === event.id);
-        setSelectedShift(clickedShift || null);
-    };
-
-    const onSelectSlot = (slotInfo) => {
-        if (viewMode.calanderView !== 'M') return;
-        if (slotInfo.slots && slotInfo.slots.length === 1) {
-            alert(`Clicked single day: ${slotInfo.start.toDateString()}`);
-            setViewMode({ ...viewMode, calanderView: 'D' });
-            setCurrentDate(slotInfo.start);
-        } else {
-            alert(
-                `Selected date cell(s): From ${slotInfo.start.toDateString()} ` +
-                `to ${slotInfo.end.toDateString()}`
-            );
-            setShowDayPreview({ startTime: slotInfo.start, endTime: slotInfo.end });
-        }
-    };
-
-    const onShowMore = (events, date) => {
-        alert(`Clicked "+${events.length} more" on date: ${date.toDateString()}`);
-        setViewMode({ ...viewMode, calanderView: 'D' });
-        setCurrentDate(date);
-    };
-
-    // Build RBC event objects from shifts
+    // Convert DB shifts -> RBC events
     const myEvents = shifts.map((shift) => {
         const shiftOwner = members.find((m) => m.id === shift.user_id);
         const ownerName = shiftOwner ? shiftOwner.username : 'Shift';
         return {
+            ...shift,
             id: shift.id,
             title: ownerName,
             start: new Date(shift.start_time),
@@ -77,12 +66,36 @@ export function CalendarComponent({
         };
     });
 
-    // Build RBC resources from members
-    const resources = members.map((emp) => ({
-        resourceId: emp.id,
-        resourceTitle: emp.username,
+    const myResources = members.map((m) => ({
+        resourceId: m.id,
+        resourceTitle: m.username,
     }));
 
+
+    // RBC handlers
+    const onSelectEvent = (event) => {
+        const clickedShift = shifts.find((s) => s.id === event.id);
+        setSelectedShift(clickedShift || null);
+    };
+
+    const onSelectSlot = (slotInfo) => {
+        if (viewMode.calanderView !== 'M') return;
+        if (slotInfo.slots?.length === 1) {
+            // Single day in Month => go to Day
+            setViewMode({ ...viewMode, calanderView: 'D' });
+            setCurrentDate(slotInfo.start);
+        } else {
+            // Multi-day => open preview
+            setShowDayPreview({ startTime: slotInfo.start, endTime: slotInfo.end });
+        }
+    };
+
+    const onShowMore = (events, date) => {
+        setViewMode({ ...viewMode, calanderView: 'D' });
+        setCurrentDate(date);
+    };
+
+    // Prev/Next handlers
     const handleNext = () => {
         if (viewMode.calanderView === 'D') {
             setCurrentDate(add(currentDate, { days: 1 }));
@@ -103,22 +116,28 @@ export function CalendarComponent({
         }
     };
 
+    // Highlight days in Month if in Individual view
     const dayPropGetter = (date) => {
-        const isBlocked = myEvents.some((event) => isSameDay(event.start, date));
-        if (viewMode.personView !== 'I' || viewMode.calanderView !== 'M') {
-            return {};
+        if (viewMode.personView === 'I' && viewMode.calanderView === 'M') {
+            const hasEvent = myEvents.some((evt) => isSameDay(evt.start, date));
+            return {
+                className: hasEvent ? 'xedOffDay cursor-pointer z-10' : 'cursor-pointer',
+            };
         }
-        return isBlocked
-            ? { className: ' xedOffDay cursor-pointer z-10' }
-            : { className: 'cursor-pointer' };
+        return {};
     };
 
+    // Format header text
     const getCalendarHeader = () => {
         if (viewMode.calanderView === 'M') {
-            return `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`;
+            return `${currentDate.toLocaleString('default', {
+                month: 'long',
+            })} ${currentDate.getFullYear()}`;
         } else if (viewMode.calanderView === 'W') {
             const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-            const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+            // Subtract 1 day from normal endOfWeek
+            const rawEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+            const end = subDays(rawEnd, 1);
             return `${format(start, 'MMM d')} - ${format(end, 'MMM d yyyy')}`;
         } else if (viewMode.calanderView === 'D') {
             return format(currentDate, 'EEEE, MMM d, yyyy');
@@ -128,18 +147,30 @@ export function CalendarComponent({
 
     return (
         <div className="flex flex-col w-full h-full">
-            {/* Custom toolbar (Prev, Header, Next) */}
+            {/* Toolbar (Prev, Title, Next) */}
             <div className="relative">
                 <div className="flex items-center justify-center p-2 bg-gray-700 text-white space-x-4">
-                    <button onClick={handlePrev} className="px-2 py-1 bg-gray-500 rounded">
-                        Prev
-                    </button>
+                    {/* Prev Button - Chevron */}
+                    <IconButton
+                        variant="text"
+                        color="blue-gray"
+                        onClick={handlePrev}
+                        className="text-gray-400 hover:text-white"
+                    >
+                        <ChevronLeftIcon className="h-6 w-6" />
+                    </IconButton>
 
-                    <span>{getCalendarHeader()}</span>
+                    <span className="font-semibold text-lg">{getCalendarHeader()}</span>
 
-                    <button onClick={handleNext} className="px-2 py-1 bg-gray-500 rounded">
-                        Next
-                    </button>
+                    {/* Next Button - Chevron */}
+                    <IconButton
+                        variant="text"
+                        color="blue-gray"
+                        onClick={handleNext}
+                        className="text-gray-400 hover:text-white"
+                    >
+                        <ChevronRightIcon className="h-6 w-6" />
+                    </IconButton>
                 </div>
 
                 {(userRole === 'owner' || userRole === 'admin') && (
@@ -163,7 +194,7 @@ export function CalendarComponent({
             {/* The Big Calendar itself */}
             <div className="flex flex-col w-full h-full overflow-y-auto scrollbar scrollbar-thumb-rounded-full scrollbar-track-rounded-full scrollbar-thumb-gray-700 scrollbar-track-gray-800 pt-5 pb-[1px]">
                 <div className="flex-1 flex">
-                    {(viewMode.calanderView === 'D' && viewMode.personView === 'G') ? (
+                    {viewMode.calanderView === 'D' && viewMode.personView === 'G' ? (
                         <GroupDayRBC
                             localizer={localizer}
                             view={rbcView}
@@ -171,11 +202,15 @@ export function CalendarComponent({
                             onNavigate={() => { }}
                             toolbar={false}
                             style={{ flex: 1 }}
-                            events={!(viewMode.calanderView === 'M' && viewMode.personView === 'I') ? myEvents : []}
+                            events={
+                                !(viewMode.calanderView === 'M' && viewMode.personView === 'I')
+                                    ? myEvents
+                                    : []
+                            }
                             startAccessor="start"
                             endAccessor="end"
                             selectable={viewMode.calanderView === 'M'}
-                            resources={resources}
+                            resources={myResources}
                             onSelectEvent={onSelectEvent}
                             onSelectSlot={onSelectSlot}
                             onShowMore={onShowMore}
@@ -189,15 +224,23 @@ export function CalendarComponent({
                             onNavigate={() => { }}
                             toolbar={false}
                             style={{ flex: 1 }}
-                            events={!(viewMode.calanderView === 'M' && viewMode.personView === 'I') ? myEvents : []}
+                            events={
+                                !(viewMode.calanderView === 'M' && viewMode.personView === 'I')
+                                    ? myEvents
+                                    : []
+                            }
                             startAccessor="start"
                             endAccessor="end"
-                            selectable={viewMode.calanderView === 'M'}
-                            // resources={resources}
+                            drilldownView="day"
+                            onDrillDown={(date) => {
+                                setViewMode({ ...viewMode, calanderView: 'D' });
+                                setCurrentDate(date);
+                            }}
                             onSelectEvent={onSelectEvent}
                             onSelectSlot={onSelectSlot}
                             onShowMore={onShowMore}
                             dayPropGetter={dayPropGetter}
+                            selectable={viewMode.calanderView === 'M'}
                         />
                     )}
                 </div>
@@ -209,7 +252,6 @@ export function CalendarComponent({
                     startTime={showDayPreview.startTime}
                     endTime={showDayPreview.endTime}
                     events={myEvents}
-                    shifts={shifts}
                     setSelectedShift={setSelectedShift}
                 />
             )}
@@ -219,6 +261,7 @@ export function CalendarComponent({
                     closeNewShiftForm={() => setShowNewShiftForm(false)}
                     employees={members}
                     groupId={groupId}
+                    getGroupData={getGroupData}
                 />
             )}
 
@@ -228,6 +271,9 @@ export function CalendarComponent({
                     employees={members}
                     closeEditShiftForm={() => setSelectedShift(null)}
                     groupId={groupId}
+                    getGroupData={getGroupData}
+                    isAdmin={userRole === 'owner' || userRole === 'admin'}
+                    membershipRequests={membershipRequests}
                 />
             )}
         </div>

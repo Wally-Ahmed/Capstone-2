@@ -49,6 +49,7 @@ export function SignUp() {
     try {
       const res = await fetch(`${backendURL}/signup`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Cache-Control': 'no-store',
           'Content-Type': 'application/json',
@@ -63,6 +64,7 @@ export function SignUp() {
       } else {
         // On successful registration, redirect to '/app'
         navigate('/app');
+        window.location.reload();
       }
     } catch (error) {
       alert(JSON.stringify(error))
@@ -253,7 +255,7 @@ export function SignUp() {
           </Button>
 
           <div className="space-y-4 mt-8 flex flex-col">
-            <Link to={`${backendURL}/signup-google`}>
+            <Link to={`${backendURL}/auth-google`}>
               <Button
                 size="lg"
                 color="white"
@@ -275,10 +277,10 @@ export function SignUp() {
                   </defs>
                 </svg>
 
-                <span>Sign Up With Google</span>
+                <span>Continue With Google</span>
               </Button>
             </Link>
-            <Link to={`${backendURL}/signup-microsoft`}>
+            <Link to={`${backendURL}/auth-microsoft`}>
               <Button
                 size="lg"
                 color="white"
@@ -296,7 +298,7 @@ export function SignUp() {
                   </g>
                 </svg>
 
-                <span>Sign Up With Microsoft</span>
+                <span>Continue With Microsoft</span>
               </Button>
             </Link>
           </div>

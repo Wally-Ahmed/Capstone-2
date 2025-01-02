@@ -40,6 +40,11 @@ export function GroupSchedule({ selectedGroup, handleSelectGroup, user }) {
         return () => clearInterval(intervalId);
     }, []);
 
+    // const myEmployees = employees.filter(member =>
+    //     !membershipRequests.some(request => request.user_id === member.id))
+
+
+
     if (!groupData) {
         return <div>Loading...</div>;
     }
@@ -73,6 +78,7 @@ export function GroupSchedule({ selectedGroup, handleSelectGroup, user }) {
                         onSelectEmployee={(emp) => setSelectedEmployee(emp)}
                         role={groupData.role}
                         membershipRequests={groupData.membership_requests}
+                        getGroupData={getGroupData}
                     />
                 </div>
             )}
@@ -86,6 +92,9 @@ export function GroupSchedule({ selectedGroup, handleSelectGroup, user }) {
                     members={groupData.members}
                     userRole={groupData.role}
                     groupId={groupData.id}
+                    getGroupData={getGroupData}
+                    isAdmin={groupData.role === 'owner' || groupData.role === 'admin'}
+                    membershipRequests={groupData.membership_requests}
                 />
             </div>
         </div>

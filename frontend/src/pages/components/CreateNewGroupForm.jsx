@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { backendURL } from '@/config';
 
-export const CreateNewGroupForm = ({ handleFormClose, selectGroup }) => {
+export const CreateNewGroupForm = ({ handleFormClose, selectGroup, refreshPage }) => {
     const [groupName, setGroupName] = useState('');
 
     const handleFormChange = (e) => {
@@ -29,6 +29,8 @@ export const CreateNewGroupForm = ({ handleFormClose, selectGroup }) => {
             const data = await res.json();
 
             selectGroup(data.group);
+
+            refreshPage()
 
             handleFormClose();
         } catch (error) {

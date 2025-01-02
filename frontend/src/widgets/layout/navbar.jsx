@@ -82,7 +82,6 @@ export function Navbar({ brandName, routes, user, authorized }) {
         setShowProfileTab(false);
       }
 
-      await getNotifications();
 
     } catch (error) {
       console.error('Session Expired', error);

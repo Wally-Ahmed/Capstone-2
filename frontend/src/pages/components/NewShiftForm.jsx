@@ -2,7 +2,7 @@ import { backendURL } from '@/config';
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 
-export const NewShiftForm = ({ closeNewShiftForm, groupId, employees = [] }) => {
+export const NewShiftForm = ({ closeNewShiftForm, groupId, getGroupData, employees = [] }) => {
     // Form state
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [startDateTime, setStartDateTime] = useState('');
@@ -39,6 +39,8 @@ export const NewShiftForm = ({ closeNewShiftForm, groupId, employees = [] }) => 
                 alert('Failed to create shift');
                 return;
             }
+
+            getGroupData()
 
             closeNewShiftForm();
         } catch (error) {

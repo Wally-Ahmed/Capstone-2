@@ -1,8 +1,10 @@
 // components/GroupSidebar.jsx
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowUturnLeftIcon, UserGroupIcon } from '@heroicons/react/24/solid';
 import { MdSettings, MdPersonAdd } from 'react-icons/md';
+import { RequestMenu } from './RequestMenu';
+import { SettingsMenu } from './SettingsMenu';
 
 export function GroupSidebar({
     selectedGroup,
@@ -11,9 +13,20 @@ export function GroupSidebar({
     role,
     membershipRequests,
     selectedEmployee,
+    getGroupData,
     // **Accept the callback from props** 
     onSelectEmployee,
 }) {
+    const [showRequestMenu, setShowRequestMenu] = useState(false);
+    const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+
+
+    const myEmployees = employees.filter(member =>
+        !membershipRequests.some(request => request.user_id === member.id))
+
+
+
+    // alert(JSON.stringify(membershipRequests))
     return (
         <div className="flex flex-col h-full">
             <div className="flex flex-row p-4 bg-gray-900 flex-shrink-0">
@@ -23,11 +36,11 @@ export function GroupSidebar({
                 <div className="flex flex-col flex-1 ml-4">
                     <div className="flex flex-col h-full gap-1 justify-between items-end">
                         <div className="h-4 flex items-center space-x-2">
-                            <button className="relative" onClick={() => { }}>
+                            <button className="relative" onClick={() => { setShowSettingsMenu(true) }}>
                                 <MdSettings className="h-4 w-5 mr-2 transform rotate-90 text-gray-600 hover:text-white transition-colors duration-200" />
                             </button>
                             {(role === 'owner' || role === 'admin') && (
-                                <button className="relative" onClick={() => { }}>
+                                <button className="relative" onClick={() => { setShowRequestMenu(true) }}>
                                     <MdPersonAdd className="h-4 w-5 mr-2 text-gray-600 hover:text-white transition-colors duration-200" />
                                     {membershipRequests.length > 0 && (
                                         <span className="absolute top-0 right-[6px] block h-2 w-2 rounded-full ring-0 ring-none bg-red-500" />
@@ -48,7 +61,7 @@ export function GroupSidebar({
             </div>
 
             <div className="flex-1 overflow-y-auto bg-gray-800 p-4 scrollbar scrollbar-thumb-rounded-full scrollbar-track-rounded-full scrollbar-thumb-gray-800 scrollbar-track-gray-900">
-                {employees.map((employee) => {
+                {myEmployees.map((employee) => {
                     const isSelected = selectedEmployee && selectedEmployee.id === employee.id;
 
                     return (
@@ -68,6 +81,9 @@ export function GroupSidebar({
                         </div>
                     );
                 })}
+
+                {showRequestMenu && <RequestMenu closeRequestMenu={() => { setShowRequestMenu(false) }} requests={membershipRequests} getGroupData={getGroupData} />}
+                {showSettingsMenu && <SettingsMenu closeSettingsMenu={() => { setShowSettingsMenu(false) }} />}
             </div>
         </div>
     );
