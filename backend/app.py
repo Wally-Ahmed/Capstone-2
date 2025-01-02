@@ -33,7 +33,7 @@ if not frontend_url:
     raise ValueError("FRONTEND_URL environment variable not set")
 
 CORS(app, resources={
-     r"/*": {"origins": ["http://localhost:5173"]}}, supports_credentials=True)
+     r"/*": {"origins": [frontend_url]}}, supports_credentials=True)
 
 
 toolbar = DebugToolbarExtension(app)
