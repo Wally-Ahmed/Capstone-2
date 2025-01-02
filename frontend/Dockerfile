@@ -1,45 +1,40 @@
-# syntax = docker/dockerfile:1
+# -------------------------------------------------------
+# 1) Build Stage
+# -------------------------------------------------------
+    FROM node:18-alpine AS build
 
-# Adjust NODE_VERSION as desired
-ARG NODE_VERSION=20.18.0
-FROM node:${NODE_VERSION}-slim as base
-
-LABEL fly_launch_runtime="Vite"
-
-# Vite app lives here
-WORKDIR /app
-
-# Set production environment
-ENV NODE_ENV="production"
-
-
-# Throw-away build stage to reduce size of final image
-FROM base as build
-
-# Install packages needed to build node modules
-RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
-
-# Install node modules
-COPY package.json ./
-RUN npm install --include=dev
-
-# Copy application code
-COPY . .
-
-# Build application
-RUN npm run build
-
-# Remove development dependencies
-RUN npm prune --omit=dev
-
-
-# Final stage for app image
-FROM nginx
-
-# Copy built application
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Start the server by default, this can be overwritten at runtime
-EXPOSE 80
-CMD [ "/usr/sbin/nginx", "-g", "daemon off;" ]
+    # Create and set the working directory inside the container
+    WORKDIR /app
+    
+    # Copy package.json and package-lock.json (if exists) first
+    COPY package*.json ./
+    
+    # Install dependencies
+    RUN npm install
+    
+    # Copy the rest of your project files
+    COPY . .
+    
+    # Build your Vite app (output goes to /app/dist)
+    RUN npm run build
+    
+    # -------------------------------------------------------
+    # 2) Production Stage
+    # -------------------------------------------------------
+    FROM node:18-alpine
+    
+    # Create and set the working directory for production
+    WORKDIR /app
+    
+    # Copy the built output from the "build" stage
+    COPY --from=build /app/dist ./dist
+    
+    # Install 'serve' globally, which can serve the built files
+    RUN npm install --global serve
+    
+    # Expose port 8080 to the outside world
+    EXPOSE 8080
+    
+    # Command to serve the app
+    CMD ["serve", "-s", "dist", "-p", "8080"]
+    

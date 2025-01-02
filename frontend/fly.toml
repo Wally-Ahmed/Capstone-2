@@ -1,32 +1,16 @@
-# fly.toml app configuration file generated for capstone-2 on 2025-01-02T18:47:59Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
-app = 'teamShyft'
-primary_region = 'iad'
+app = "my-vite-spa"
 
 [build]
-
-[[static_sites]]
-  backend = "static"
-  source = "./dist"  # Ensure this path points to your Vite build directory
-  fallback = "/index.html"
+image = "dockerfile"  # Tells Fly to use your Dockerfile
 
 [[services]]
-  internal_port = 80
-  protocol = "tcp"
+internal_port = 8080
+processes = ["app"]
 
-  [[services.ports]]
-    handlers = ["http"]
-    port = 80
+[[services.ports]]
+handlers = ["http"]
+port     = 80
 
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = 443
-
-[[vm]]
-  memory = '1gb'
-  cpu_kind = 'shared'
-  cpus = 1
-  memory_mb = 1024
+[[services.ports]]
+handlers = ["tls", "http"]
+port     = 443
