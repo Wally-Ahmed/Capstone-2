@@ -3,18 +3,27 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'capstone-2'
+app = 'teamShyft'
 primary_region = 'iad'
 
 [build]
 
-[http_service]
+[[static_sites]]
+  backend = "static"
+  source = "./dist"  # Ensure this path points to your Vite build directory
+  fallback = "/index.html"
+
+[[services]]
   internal_port = 80
-  force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ['app']
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
 
 [[vm]]
   memory = '1gb'
