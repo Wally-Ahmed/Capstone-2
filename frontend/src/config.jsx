@@ -1,1 +1,1 @@
-export const backendURL = import.meta.env.VITE_API_BACKEND_URL || "http://localhost:5000"
+export const backendURL = 'https://capstone-2-1.onrender.com'
