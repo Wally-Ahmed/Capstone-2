@@ -28,6 +28,12 @@ app.config['SQLALCHEMY_ECHO'] = True
 app.config['SECRET_KEY'] = os.getenv("secretKey")
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 
+app.config.update(
+    SESSION_COOKIE_SAMESITE='None',  # Allows cookies to be sent in cross-site requests
+    SESSION_COOKIE_SECURE=True,      # Ensures cookies are only sent over HTTPS
+    SESSION_COOKIE_HTTPONLY=True,    # Prevents JavaScript from accessing the cookie
+)
+
 redirect_url = os.getenv('AUTH_REDIRECT_URL') or '/'
 
 # Initialize CORS
