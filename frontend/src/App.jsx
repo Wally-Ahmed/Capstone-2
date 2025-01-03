@@ -4,6 +4,7 @@ import routes from "@/routes";
 import { Home, Profile, SignIn, SignUp, Contact, TeamShyft } from "@/pages";
 import React, { useState, useEffect } from 'react';
 import { backendURL } from '@/config';
+import { Helmet } from "react-helmet";
 
 
 function App() {
