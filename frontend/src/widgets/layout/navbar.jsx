@@ -85,7 +85,7 @@ export function Navbar({ brandName, routes, user, authorized }) {
 
     } catch (error) {
       console.error('Session Expired', error);
-      alert('Your login session has expired, please refresh your credentials.');
+      alert('Your session has expired, please login again.');
     }
   };
 
