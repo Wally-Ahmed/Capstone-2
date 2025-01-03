@@ -22,6 +22,7 @@ export const ProfileTab = ({ showProfileTab, closeProfileTab, user, notification
                 closeProfileTab();
             }
         };
+        readNotifications();
     }, []);
 
     return ReactDOM.createPortal(
