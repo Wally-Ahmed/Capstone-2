@@ -4,7 +4,6 @@ import routes from "@/routes";
 import { Home, Profile, SignIn, SignUp, Contact, TeamShyft } from "@/pages";
 import React, { useState, useEffect } from 'react';
 import { backendURL } from '@/config';
-import { Helmet } from "react-helmet";
 
 
 function App() {
@@ -41,9 +40,6 @@ function App() {
 
   return (
     <>
-      <Helmet>
-        <meta name="viewport" content={`width=1920, initial-scale=1.0`} />
-      </Helmet>
       {!(pathname == '/login' || pathname == '/sign-up') && (
         <div className="container absolute left-2/4 z-10 mx-auto -translate-x-2/4 p-4">
           <Navbar routes={routes} user={user} authorized={isAuthorized} />

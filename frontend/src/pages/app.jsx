@@ -5,6 +5,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { backendURL } from '@/config';
 import { SelectGroup } from './components/SelectGroup';
 import { GroupSchedule } from './components/GroupSchedule';
+import { Helmet } from "react-helmet";
 
 export function TeamShyft() {
   const navigate = useNavigate();
@@ -96,6 +97,9 @@ export function TeamShyft() {
     // Simple loading screen
     return (
       <>
+        <Helmet>
+          <meta name="viewport" content={`width=1920, initial-scale=1.0`} />
+        </Helmet>
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center">
           <div className="absolute top-0 h-full w-full bg-black bg-cover bg-center" />
           <div className="absolute top-0 h-full w-full bg-[url('/img/background-3.png')] bg-cover bg-center" />
@@ -109,6 +113,9 @@ export function TeamShyft() {
 
   return (
     <>
+      <Helmet>
+        <meta name="viewport" content={`width=1920, initial-scale=1.0`} />
+      </Helmet>
       {/* Background */}
       <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center">
         <div className="absolute top-0 h-full w-full bg-black bg-cover bg-center" />
